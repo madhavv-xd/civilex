@@ -1,0 +1,19 @@
+{
+  "grid_size": 15,
+  "max_turns": 50,
+  "starting_tiles_per_civ": 3,
+  "tile_types": {
+    "plains":   { "food": 3, "gold": 1, "stone": 1, "weight": 30 },
+    "forest":   { "food": 2, "gold": 1, "stone": 3, "weight": 20 },
+    "mountain": { "food": 0, "gold": 2, "stone": 5, "weight": 15 },
+    "river":    { "food": 4, "gold": 2, "stone": 1, "weight": 15 },
+    "coast":    { "food": 3, "gold": 3, "stone": 0, "weight": 10 },
+    "ruins":    { "food": 0, "gold": 5, "stone": 2, "weight": 10 }
+  },
+  "event_chance_per_turn": 0.20,
+  "win_conditions": {
+    "domination_tile_threshold": 0.60,
+    "elimination_wins": true,
+    "diplomatic_turns_required": 10
+  }
+}

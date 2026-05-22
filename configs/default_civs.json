@@ -1,0 +1,58 @@
+[
+  {
+    "id": "ironhold",
+    "name": "The Ironhold Confederacy",
+    "traits": ["militaristic", "proud", "distrustful", "expansionist"],
+    "personality": "Ironhold values strength above all. They respect power and despise weakness. They will expand aggressively, form alliances only when tactically necessary, and betray partners the moment a better opportunity arises.",
+    "starting_resources": {
+      "gold": 100,
+      "food": 60,
+      "stone": 80,
+      "military": 85
+    },
+    "color": "#C0392B",
+    "spawn_corner": "top_left"
+  },
+  {
+    "id": "verdant",
+    "name": "The Verdant Pact",
+    "traits": ["diplomatic", "pacifist", "nature-focused", "generous"],
+    "personality": "The Verdant Pact believes harmony between civilizations is the path to prosperity. They prefer trade and alliances over war, will always attempt diplomacy first, and hold grudges for a very long time when betrayed.",
+    "starting_resources": {
+      "gold": 80,
+      "food": 140,
+      "stone": 60,
+      "military": 30
+    },
+    "color": "#27AE60",
+    "spawn_corner": "top_right"
+  },
+  {
+    "id": "merchants",
+    "name": "The Ashborne Merchant Guild",
+    "traits": ["shrewd", "transactional", "neutral", "opportunistic"],
+    "personality": "The Guild has no permanent friends or enemies — only permanent interests. Every decision is a calculation of cost and benefit. They will trade with anyone, betray anyone, and smile while doing it.",
+    "starting_resources": {
+      "gold": 200,
+      "food": 80,
+      "stone": 60,
+      "military": 20
+    },
+    "color": "#F39C12",
+    "spawn_corner": "bottom_left"
+  },
+  {
+    "id": "conclave",
+    "name": "The Silent Conclave",
+    "traits": ["mysterious", "isolationist", "unpredictable", "patient"],
+    "personality": "The Conclave speaks little and observes everything. They will spend the first half of the simulation seemingly doing nothing — building strength in silence. Then they act decisively and without warning. They never explain their reasoning.",
+    "starting_resources": {
+      "gold": 120,
+      "food": 90,
+      "stone": 100,
+      "military": 50
+    },
+    "color": "#8E44AD",
+    "spawn_corner": "bottom_right"
+  }
+]
