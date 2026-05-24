@@ -33,6 +33,10 @@ export * from "./events"
 index()
 ## CORE_MODULES
 
+### `README.md`
+
+**Purpose:** Implements README.
+
 ### `.gitignore`
 
 **Purpose:** Implements .gitignore.
@@ -44,14 +48,14 @@ index()
 **Functions:**
 - `function SimulationPage({ params }: { params: { id: string } })`
 
+## SUPPORTING_MODULES
+
 ### `src/app/page.tsx`
 
-**Purpose:** Implements page.
+```typescript
+function HomePage()
 
-**Functions:**
-- `function HomePage()`
-
-## SUPPORTING_MODULES
+```
 
 ### `src/app/globals.css`
 
@@ -81,10 +85,6 @@ function RootLayout(
 *43 lines, 0 imports*
 
 ### `src/types/world.ts`
-
-*33 lines, 0 imports*
-
-### `src/types/civilization.ts`
 
 *33 lines, 0 imports*
 
@@ -123,28 +123,28 @@ graph LR
 
 | File | Score | Tier | Tokens |
 |------|-------|------|--------|
-| `.gitignore` | 0.500 | structured summary | 13 |
-| `src/types/index.ts` | 0.196 | full source | 37 |
-| `src/app/simulation/[id]/page.tsx` | 0.100 | structured summary | 41 |
-| `src/app/page.tsx` | 0.100 | structured summary | 24 |
-| `src/app/globals.css` | 0.100 | signatures | 16 |
-| `src/app/layout.tsx` | 0.100 | signatures | 17 |
-| `package-lock.json` | 0.099 | one-liner | 12 |
-| `src/store/eventStore.ts` | 0.097 | signatures | 16 |
-| `src/store/worldStore.ts` | 0.097 | signatures | 16 |
-| `src/store/simStore.ts` | 0.097 | signatures | 17 |
-| `src/types/events.ts` | 0.096 | signatures | 15 |
-| `src/types/world.ts` | 0.096 | signatures | 15 |
-| `src/types/civilization.ts` | 0.096 | signatures | 17 |
-| `src/types/simulation.ts` | 0.096 | one-liner | 13 |
-| `src/lib/apiClient.ts` | 0.096 | one-liner | 17 |
-| `src/app/history/page.tsx` | 0.096 | one-liner | 22 |
-| `next.config.ts` | 0.096 | one-liner | 11 |
-| `package.json` | 0.050 | one-liner | 10 |
-| `AGENTS.md` | 0.050 | one-liner | 11 |
-| `CLAUDE.md` | 0.050 | one-liner | 12 |
-| `tsconfig.json` | 0.050 | one-liner | 11 |
-| `README.md` | 0.000 | one-liner | 10 |
+| `README.md` | 0.500 | structured summary | 11 |
+| `.gitignore` | 0.267 | structured summary | 13 |
+| `src/types/index.ts` | 0.165 | full source | 37 |
+| `src/app/simulation/[id]/page.tsx` | 0.067 | structured summary | 41 |
+| `src/app/page.tsx` | 0.067 | signatures | 16 |
+| `src/app/globals.css` | 0.067 | signatures | 16 |
+| `src/app/layout.tsx` | 0.067 | signatures | 17 |
+| `package-lock.json` | 0.067 | one-liner | 12 |
+| `src/store/eventStore.ts` | 0.066 | signatures | 16 |
+| `src/store/worldStore.ts` | 0.066 | signatures | 16 |
+| `src/store/simStore.ts` | 0.066 | signatures | 17 |
+| `src/types/events.ts` | 0.065 | signatures | 15 |
+| `src/types/world.ts` | 0.065 | signatures | 15 |
+| `src/types/civilization.ts` | 0.065 | one-liner | 14 |
+| `src/types/simulation.ts` | 0.065 | one-liner | 13 |
+| `src/lib/apiClient.ts` | 0.065 | one-liner | 17 |
+| `src/app/history/page.tsx` | 0.065 | one-liner | 22 |
+| `next.config.ts` | 0.065 | one-liner | 11 |
+| `package.json` | 0.038 | one-liner | 10 |
+| `AGENTS.md` | 0.038 | one-liner | 11 |
+| `CLAUDE.md` | 0.038 | one-liner | 12 |
+| `tsconfig.json` | 0.038 | one-liner | 11 |
 | `eslint.config.mjs` | 0.000 | one-liner | 16 |
 | `postcss.config.mjs` | 0.000 | one-liner | 13 |
 | `public/file.svg` | 0.000 | one-liner | 11 |
@@ -156,6 +156,7 @@ graph LR
 ## PERIPHERY
 
 - `package-lock.json` — 7401 lines
+- `src/types/civilization.ts` — 33 lines
 - `src/types/simulation.ts` — 22 lines
 - `src/lib/apiClient.ts` — 1 function, 20 lines
 - `src/app/history/page.tsx` — 1 function, 1 imports, 17 lines
@@ -164,7 +165,6 @@ graph LR
 - `AGENTS.md` — 6 lines
 - `CLAUDE.md` — 2 lines
 - `tsconfig.json` — 35 lines
-- `README.md` — 37 lines
 - `eslint.config.mjs` — 3 imports, 19 lines
 - `postcss.config.mjs` — 8 lines
 - `public/file.svg` — 1 lines
