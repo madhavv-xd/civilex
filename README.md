@@ -1,8 +1,6 @@
 # AI Civilization Simulator
 
-Spawn AI-driven civilizations on a hexagonal grid world and watch history write
-itself. Each civilization's decisions — diplomacy, war, trade, expansion — are
-powered by a large language model via the OpenRouter API.
+Spawn AI-driven civilizations on a hexagonal grid world and watch history write itself. Each civilization's decisions — diplomacy, war, trade, expansion — are powered by a large language model via the OpenRouter API, adjudicated by a deterministic world engine, and narrated into historical chronicles.
 
 ```
 civilex/
@@ -19,8 +17,8 @@ civilex/
 |-------|-------------|--------|
 | 1 | Backend scaffold + data models | ✅ Complete |
 | 2 | Hex grid world gen + civ configs + LLM client | ✅ Complete |
-| 3 | Config files | ✅ Complete |
-| 4 | Simulation engine | ⏳ Pending |
+| 3 | Agent system + world engine + prompts + end-to-end test | ✅ Complete |
+| 4 | Full simulation loop | ✅ Complete |
 | 5 | Live viewer | ⏳ Pending |
 | 6 | History viewer | ⏳ Pending |
 
@@ -30,7 +28,7 @@ civilex/
 
 ### Prerequisites
 
-- **Python 3.12+** with [uv](https://docs.astral.sh/uv/)
+- **Python 3.11+** with [uv](https://docs.astral.sh/uv/)
 - **Node.js 20+**
 - **MongoDB** — local or [Atlas](https://www.mongodb.com/atlas)
 - **OpenRouter API key** — register at https://openrouter.ai/keys
@@ -39,9 +37,9 @@ civilex/
 
 ```bash
 cd backend
-uv sync                         # Install Python deps into .venv
+uv sync                              # Install Python deps into .venv
 # Edit .env (copy from template below)
-uv run python api/server.py     # Starts at http://localhost:8000
+uv run python api/server.py          # Starts at http://localhost:8000
 ```
 
 ### Frontend
@@ -49,8 +47,30 @@ uv run python api/server.py     # Starts at http://localhost:8000
 ```bash
 cd frontend
 npm install
-npm run dev                     # Opens at http://localhost:3000
+npm run dev                          # Opens at http://localhost:3000
 ```
+
+---
+
+## Quick Test — Single Turn End-to-End
+
+Run one complete turn of the simulation without starting the server:
+
+```bash
+cd backend
+uv run python scripts/test_single_turn.py
+```
+
+This does everything in sequence:
+1. Generates a 15×15 hex world (seed=42)
+2. Builds turn-0 civ states for all 4 civilizations
+3. Calls the LLM for each civ's decision (in parallel)
+4. Resolves all decisions through the world engine (war, trade, alliances, infrastructure, captures)
+5. Rolls for a random world event (drought, plague, gold discovery, etc.)
+6. Narrates the turn in historical prose
+7. Prints everything to the console
+
+No database writes — pure simulation.
 
 ---
 
@@ -80,6 +100,62 @@ World and civ defaults are in `configs/`:
 | The Ashborne Merchant Guild | shrewd, transactional, neutral, opportunistic | 200/80/60/20 |
 | The Silent Conclave | mysterious, isolationist, unpredictable, patient | 120/90/100/50 |
 
+### World Parameters
+
+| Parameter | Value |
+|-----------|-------|
+| Grid size | 15×15 (225 tiles) |
+| Max turns | 50 |
+| Starting tiles per civ | 3 |
+| Event chance per turn | 20% |
+| Tile types | plains (30%), forest (20%), mountain (15%), river (15%), coast (10%), ruins (10%) |
+| Win: domination | 60% of all tiles |
+| Win: elimination | Enabled |
+| Win: diplomatic | 10 turns of alliance victory |
+
+---
+
+## Architecture
+
+The simulation runs in a 7-step loop each turn:
+
+```
+  1. Resource tick    — owned tiles yield food/gold/stone
+  2. Agent decisions  — LLM decides each civ's next move
+  3. World engine     — deterministic resolution of all decisions
+  4. Event agent      — 20% chance of random world event
+  5. Elimination check— civs with 0 tiles are removed
+  6. Memory refresh   — compress event log into memory summary
+  7. Narrator         — write historical chronicle entry
+```
+
+**World Engine** (`agents/world_engine.py`) — Pure Python referee. Resolves wars (battle math with random variance), tile captures, trade deals, alliances, infrastructure projects, resource collection, food consumption, and starvation penalties.
+
+**Civ Agent** (`agents/civ_agent.py`) — Each civ is an LLM agent returning a structured JSON decision. All civs decide in parallel via `asyncio.gather`. Retry logic with fallback to idle on failure.
+
+**Event Agent** (`agents/event_agent.py`) — 20% chance per turn. LLM picks the most dramatically interesting event type with magnitude (1-3), applied deterministically.
+
+**Narrator Agent** (`agents/narrator_agent.py`) — Writes 2-3 sentences of historical prose per turn. Formal, dramatic tone — past tense, no meta references.
+
+**Memory Manager** (`agents/memory_manager.py`) — Every 5 turns, compresses each civ's event history into a 3-sentence second-person memory summary injected into their agent prompt.
+
+**Prompt Builder** (`utils/prompt_builder.py`) — Loads `.txt` templates and fills them with live simulation data via `{placeholder}` syntax.
+
+---
+
+## Prompt Templates
+
+Four `.txt` files in `backend/prompts/` define LLM agent behaviour:
+
+| Template | Lines | Purpose |
+|----------|-------|---------|
+| `civ_system.txt` | 45 | Civ identity + 6 actions (`declare_war`, `propose_trade`, `form_alliance`, `capture_tile`, `build_infrastructure`, `idle`) with JSON output format and decision rules |
+| `event_agent.txt` | 36 | 6 world event types (drought, plague, gold discovery, natural disaster, ancient ruins, rebellion) with narrative targeting guidance |
+| `narrator_system.txt` | 41 | Historical prose style guide — formal, past tense, 2-3 sentences, no meta-references, tone per event type |
+| `memory_system.txt` | 26 | 3-sentence memory compression — second person, major events only, refreshed every 5 turns |
+
+`civ_system.txt` includes per-turn context: current resources, tile count, relationships with mood labels (allied/friendly/neutral/hostile/at war), memory summary, and a compact world state of other civs. `event_agent.txt` prioritises dramatic tension and power-balancing — drought targets the civ with most food, plague targets the strongest military, natural disaster hits a dominant civ, ancient ruins rewards the underdog. `narrator_system.txt` maps tone to content: wars are grave, alliances cautiously optimistic, betrayals darkly dramatic, world events biblical, quiet turns ominous. `memory_system.txt` writes in second person ("You declared war on the Verdant Pact on turn 4...") and ends with current strategic state.
+
 ---
 
 ## API Reference
@@ -87,7 +163,7 @@ World and civ defaults are in `configs/`:
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/health` | Server + MongoDB connection status |
-| `GET` | `/api/world/preview?grid_size=15&seed=42` | Generate a fresh world (not saved to DB). Returns tiles, civ positions, distribution |
+| `GET` | `/api/world/preview?grid_size=15&seed=42` | Generate a fresh world (not saved). Returns tiles, civ positions, distribution |
 
 ---
 
@@ -99,8 +175,8 @@ Four MongoDB document types (Beanie ODM):
 |----------|---------|
 | **Simulation** | Top-level run — status, turn counter, winner, config |
 | **CivState** | Per-civ per-turn snapshot — resources, tiles, relationships, memory |
-| **Event** | Everything that happens — war, trade, disasters, narrator entries |
-| **Turn** | Full world snapshot — every tile + all civ resource snapshots |
+| **Event** | Everything that happens — war, trade, disasters, narrator (21 event types) |
+| **Turn** | Full world snapshot — every tile with owner + all civ resource snapshots |
 
 ---
 
@@ -108,123 +184,104 @@ Four MongoDB document types (Beanie ODM):
 
 ```bash
 cd backend
-uv run python scripts/smoke_test.py         # Phase 1 — models & DB
-uv run python scripts/test_worldgen.py       # Phase 2 — world generation
-uv run python scripts/test_openrouter.py     # LLM connectivity
+uv run python scripts/smoke_test.py           # Phase 1 — models & DB
+uv run python scripts/test_worldgen.py         # Phase 2 — world generation
+uv run python scripts/test_openrouter.py       # LLM connectivity
+uv run python scripts/test_single_turn.py      # Phase 3 — full turn end-to-end
 ```
 
 ---
 
-## Phase 1 — Scaffold
+## Phase 1 — Backend Scaffold
 
-**Goal:** Get the project skeleton standing with both backend and frontend talking
-to each other.
-
-### Backend
-
-- **FastAPI** application with CORS middleware, lifespan hooks to connect/disconnect
-  MongoDB on startup/shutdown (`backend/api/server.py`)
-- **MongoDB** connection via Motor (async driver) + Beanie ODM (`backend/db/client.py`)
-- All four core **document models** defined with Pydantic validation:
-  - `Simulation` — status (pending/running/paused/completed/failed), turn counter, winner
-  - `CivState` — resources (gold/food/stone/military), traits, alive flag, relationships, memory
-  - `Event` — typed events (war, peace, trade, drought, plague, narrator, etc.)
-  - `Turn` — full world snapshot (tile grid + civ resource snapshots)
-- Database **index creation** (`backend/db/indexes.py`) — compound unique indexes on
-  `(sim_id, turn)`, `(sim_id, turn, civ_id)`
+- **FastAPI** with CORS middleware, lifespan hooks for MongoDB connect/disconnect
+- **MongoDB** via Motor + Beanie ODM (`db/client.py`)
+- Four **document models**: `Simulation`, `CivState`, `Event` (21 EventType values), `Turn`
+- Database **indexes**: unique compound indexes on `(sim_id, turn)`, `(sim_id, turn, civ_id)`
 - Health endpoint returning server + DB status
 
-### Frontend
+---
 
-- **Next.js 16** app with Tailwind CSS v4, Geist font, dark theme (`globals.css`)
-- **Dashboard page** (`page.tsx`) — shows 4 civ cards, MongoDB connection pill,
-  disabled "Start Simulation" button (wired in Phase 4), phase progress indicator
-- **Placeholder pages** — `/history` (Phase 6) and `/simulation/[id]` (Phase 5)
-- **Three Zustand stores** — `simStore` (current sim + status), `eventStore`
-  (event list + narrator log), `worldStore` (world + civ states)
-- Typed **API client** (`apiClient.ts`) — generic `apiFetch<T>` wrapping `fetch()`
-- Full **TypeScript types** mirroring backend models — `Simulation`, `SimConfig`,
-  `CivState`, `Resources`, `HexTile`, `WorldState`, `SimEvent`, `EventType`
+## Phase 2 — World Generation & Config
+
+**Hex Grid** (`simulation/hex_grid.py`) — Immutable `Hex(q, r)` dataclass using axial coordinates (pointy-top). 6-direction neighbors, Manhattan distance, ring/spiral generation, pixel coordinate conversion, 15×15=225 tile grid centered on (0,0), corner hexes for spawning.
+
+**World Generator** (`simulation/world_state.py`) — Weighted random tile type assignment (plains 30%, forest 20%, mountain/river 15%, coast/ruins 10%). 3 contiguous starting tiles per civ via spiral expansion. Builds `WorldSnapshot` with tiles and civ resource snapshots.
+
+**Civilization Builder** (`simulation/civilizations.py`) — Loads 4 civ configs from JSON. Builds turn-0 `CivState` documents with resources and neutral relationships. Helpers: `get_civ_config`, `get_civ_personality`, `get_all_civ_ids`.
+
+**LLM Client** (`utils/llm.py`) — Wraps OpenRouter `/v1/chat/completions`. Configurable model/temperature/max tokens. Runs blocking HTTP in a threadpool executor.
+
+**Hex Math** (`utils/hex_math.py`) — `get_tiles_in_range`, `get_border_tiles`, `is_connected` (BFS), `find_path` (BFS), `tiles_owned_by`, `domination_percentage`.
 
 ---
 
-## Phase 2 — World & Models
+## Phase 3 — Agents & World Engine
 
-**Goal:** Build the hexagonal grid, generate a playable world, configure the
-civilizations, and connect to the LLM.
+### Civ Agent (`agents/civ_agent.py`)
 
-### Hex Grid (`backend/simulation/hex_grid.py`)
+Each civ is an LLM agent receiving a system prompt (identity, personality, rules) and a user message (resources, relationships, memory, world state). Returns validated JSON:
+- **6 actions**: declare_war, propose_trade, form_alliance, capture_tile, build_infrastructure, idle
+- **target**: civ_id, tile coords ("q,r"), or null
+- **reasoning**: 2-3 sentences in character
+- **tone**: aggressive, diplomatic, cautious, mysterious, opportunistic
+- Up to 2 retries on parse failure, falls back to idle. All civs decide in parallel.
 
-Immutable `Hex(q, r)` dataclass using **axial coordinates** (pointy-top
-orientation). Includes:
-- **6-direction neighbor** lookup (`hex_neighbors`), **Manhattan distance**
-- **Ring** (hexes at exact radius) and **spiral** (filled circle) generation
-- **Pixel coordinate** conversion — `hex_to_pixel` and `pixel_to_hex` for
-  rendering on the frontend map
-- **Grid generation** — `generate_grid_coords(15)` creates a 15×15=225 tile
-  rhombus centered on (0,0)
-- **Corner hexes** for spawning — `get_corner_hexes` returns top-left/right,
-  bottom-left/right positions with a 2-tile margin
+### World Engine (`agents/world_engine.py`)
 
-### World Generator (`backend/simulation/world_state.py`)
+Deterministic referee. Resolution order by priority:
 
-- Loads `world_params.json` and `default_civs.json`
-- **Tile type assignment** — weighted random selection (plains 30%, forest 20%,
-  mountain/ river 15%, coast/ruins 10%); each type has food/gold/stone yields
-- **Civ starting tiles** — 3 contiguous tiles per civ via spiral expansion from
-  their spawn corner; no overlap between civs
-- Builds a **`WorldSnapshot`** (all tiles with owners + civ resource snapshots)
-- **`world_snapshot_to_dict`** serializer for API responses
+1. **Resource tick** — tiles yield food/gold/stone; military consumes food; starvation reduces military
+2. **War** — battle math: `attacker_power = military * random(0.8, 1.2)`, attacker wins if `att_power > def_military * 0.6`. Casualties both sides (5-15% attacker, 10-25% defender). Border tile seized on victory. Relationship penalty (-40)
+3. **Tile capture** — requires military advantage for contested tiles; small military loss on contested attempts
+4. **Infrastructure** — costs 50 stone, permanently +10% food on all owned tiles
+5. **Trade** — auto-accept if relationship ≥ 20, auto-reject if ≤ -20, coin flip otherwise; both gain 30 gold
+6. **Alliance** — requires relationship ≥ 0; +40 relationship boost. Auto-reject if hostile
+7. **Elimination** — civs with 0 tiles marked dead
 
-### Civilization Builder (`backend/simulation/civilizations.py`)
+### Event Agent (`agents/event_agent.py`)
 
-- Loads 4 civ configs from JSON — traits, personality prompts, starting resources
-- Builds turn-0 **`CivState` documents** with initial resources and neutral
-  relationships to all other civs
-- Helpers: `get_civ_config`, `get_civ_personality`, `get_all_civ_ids` (used by
-  LLM agent prompts)
+20% chance per turn. LLM picks from 6 types: drought (reduces food tiles), plague (reduces military), gold discovery (boosts neutral tile), natural disaster (removes border tiles), ancient ruins found (grants gold), rebellion (starving civ loses a tile). Magnitude 1-3.
 
-### LLM Client (`backend/utils/llm.py`)
+### Narrator Agent (`agents/narrator_agent.py`)
 
-- Wraps the **OpenRouter `/v1/chat/completions`** API
-- Configurable model, temperature, max tokens
-- Runs the blocking HTTP call in a threadpool executor (`run_in_executor`) so
-  it doesn't block the async event loop
+Writes 2-3 sentences of formal historical prose each turn. Past tense, no meta-references. The system prompt includes 3 example entries showing the desired style.
 
-### Hex Math Utilities (`backend/utils/hex_math.py`)
+### Memory Manager (`agents/memory_manager.py`)
 
-- **`get_tiles_in_range`** — all valid grid tiles within a radius
-- **`get_border_tiles`** — neutral/enemy tiles adjacent to owned territory
-- **`is_connected`** — BFS flood-fill check for territory contiguity
-- **`find_path`** — BFS pathfinding through passable tiles
-- **`tiles_owned_by` / `domination_percentage`** — territory tracking
-
-### World Preview Endpoint
-
-`GET /api/world/preview?grid_size=15&seed=42` — generates a fresh world and
-returns tile type distribution, civ starting positions, and the full tile data.
-Used for frontend map debugging before the simulation engine is wired up.
+Every 5 turns, compresses each civ's event history into a 3-sentence second-person summary using LangChain's `ChatOpenAI` wrapper. Only refreshes when `turn % 5 == 0` to save API calls.
 
 ---
 
-## Files at a Glance
+## File Reference
 
 | File | What It Does |
 |------|-------------|
-| `backend/api/routes.py` | HTTP endpoints (`/health`, `/world/preview`) |
-| `backend/api/server.py` | FastAPI app factory, CORS, lifespan |
-| `backend/config.py` | Pydantic `Settings` loaded from `.env` |
-| `backend/db/client.py` | `connect_db`, `close_db`, `ping_db` |
-| `backend/db/indexes.py` | MongoDB index creation |
-| `backend/models/simulation.py` | `Simulation` + `SimConfig` + `SimStatus` |
-| `backend/models/civ_state.py` | `CivState` + `Resources` |
-| `backend/models/event.py` | `Event` + `EventType` (21 values) |
-| `backend/models/turn.py` | `Turn` + `WorldSnapshot` + `TileSnapshot` |
-| `backend/simulation/hex_grid.py` | `Hex` dataclass, axial coords, geometry |
-| `backend/simulation/world_state.py` | World generation, tile assignment |
-| `backend/simulation/civilizations.py` | Civ config loader, initial states |
-| `backend/utils/hex_math.py` | Border detection, pathfinding, territory |
-| `backend/utils/llm.py` | OpenRouter API wrapper |
+| `api/server.py` | FastAPI app factory, CORS, lifespan |
+| `api/routes.py` | HTTP endpoints (`/health`, `/world/preview`) |
+| `config.py` | Pydantic `Settings` loaded from `.env` |
+| `db/client.py` | `connect_db`, `close_db`, `ping_db` |
+| `db/indexes.py` | MongoDB index creation |
+| `models/simulation.py` | `Simulation` + `SimConfig` + `SimStatus` |
+| `models/civ_state.py` | `CivState` + `Resources` |
+| `models/event.py` | `Event` + `EventType` (21 values) |
+| `models/turn.py` | `Turn` + `WorldSnapshot` + `TileSnapshot` |
+| `simulation/hex_grid.py` | `Hex` dataclass, axial coords, geometry |
+| `simulation/world_state.py` | World generation, tile assignment |
+| `simulation/civilizations.py` | Civ config loader, initial states |
+| `utils/hex_math.py` | Border detection, pathfinding, territory |
+| `utils/prompt_builder.py` | Prompt template loader + fillers |
+| `utils/llm.py` | OpenRouter API wrapper |
+| `agents/civ_agent.py` | LLM-powered civ decision agent |
+| `agents/world_engine.py` | Deterministic turn resolution referee |
+| `agents/event_agent.py` | Random world event generator |
+| `agents/narrator_agent.py` | Historical chronicle writer |
+| `agents/memory_manager.py` | Event history compression |
+| `prompts/civ_system.txt` | Civ identity + decision format (45 lines) |
+| `prompts/event_agent.txt` | World event rules + output format (36 lines) |
+| `prompts/narrator_system.txt` | Narration style guide (41 lines) |
+| `prompts/memory_system.txt` | Memory compression instructions (26 lines) |
+| `scripts/test_single_turn.py` | Full single-turn end-to-end test |
 | `frontend/src/app/page.tsx` | Dashboard with civ cards + DB status |
 | `frontend/src/lib/apiClient.ts` | Typed `apiFetch<T>` helper |
 | `frontend/src/store/*.ts` | Zustand stores (sim, event, world) |
