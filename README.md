@@ -5,7 +5,7 @@ Spawn AI-driven civilizations on a hexagonal grid world and watch history write 
 ```
 civilex/
 ├── backend/       Python FastAPI + MongoDB (Beanie ODM)
-├── frontend/      Next.js 16 + React 19 + Tailwind CSS 4 + Zustand
+├── frontend/      Next.js 16 + React 19 + Tailwind CSS 4 + Zustand + D3
 └── configs/       World parameters & civilization configuration
 ```
 
@@ -156,8 +156,6 @@ Four `.txt` files in `backend/prompts/` define LLM agent behaviour:
 | `narrator_system.txt` | 41 | Historical prose style guide — formal, past tense, 2-3 sentences, no meta-references, tone per event type |
 | `memory_system.txt` | 26 | 3-sentence memory compression — second person, major events only, refreshed every 5 turns |
 
-`civ_system.txt` includes per-turn context: current resources, tile count, relationships with mood labels (allied/friendly/neutral/hostile/at war), memory summary, and a compact world state of other civs. `event_agent.txt` prioritises dramatic tension and power-balancing — drought targets the civ with most food, plague targets the strongest military, natural disaster hits a dominant civ, ancient ruins rewards the underdog. `narrator_system.txt` maps tone to content: wars are grave, alliances cautiously optimistic, betrayals darkly dramatic, world events biblical, quiet turns ominous. `memory_system.txt` writes in second person ("You declared war on the Verdant Pact on turn 4...") and ends with current strategic state.
-
 ---
 
 ## API Reference
@@ -292,15 +290,60 @@ After `check_winner`, the graph either terminates (`END`) or loops back to `incr
 
 ---
 
+## Phase 5 — Frontend Application
+
+The frontend is a **Next.js 16** single-page application with React 19, Tailwind CSS 4, Zustand, and D3.js. It connects to the backend API and SSE stream to provide real-time simulation viewing.
+
+### Pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Dashboard | Civ overview cards, DB status, Start Simulation button, recent simulations |
+| `/history` | History | List of all past simulations with winner, turn count, date |
+| `/simulation/[id]` | Sim View | Live hex map, event chronicle, civ panels, win screen |
+
+### Components
+
+| Component | Description |
+|-----------|-------------|
+| **HexGrid** | D3.js SVG rendering of the 15×15 hex grid. Converts axial coords to pixel positions. Tile fill blends terrain color with owner color. Stroke reflects ownership. Hover tooltip shows tile details. Animated transitions on ownership changes. |
+| **CivPanel** | Horizontal bottom bar showing all 4 civs simultaneously. Per-civ card: icon, name, tile count, alive/eliminated status, resource bars scaled relative to max, last action text, relationship dots (green→red gradient). |
+| **EventFeed** | Right sidebar scrollable timeline. Groups events per turn with narrator blocks (amber-bordered quotes) and event cards (icons, colored labels, narrative text). Auto-scrolls at bottom. |
+| **SimControls** | Top bar: turn counter, progress bar, status badge (green pulse for running), stop button, stream status indicator. |
+| **WinScreen** | Overlay on sim completion. Trophy icon, win type label, winner name with civ icon, final narrative quote. Dynamic gradient background using winner's color. |
+
+### State Management (Zustand)
+
+| Store | Purpose |
+|-------|---------|
+| `useSimStore` | Current simulation metadata (id, status, turn, winner, config) |
+| `useWorldStore` | World state (tiles, civ resources) and civ states |
+| `useEventStore` | Event log array and narrator log entries |
+
+### Hooks
+
+| Hook | Description |
+|------|-------------|
+| `useSimulation` | `startSim()` — POSTs to API and navigates to sim page. `stopSim()` — POSTs stop and updates store. Tracks loading/error states. |
+| `useEventStream` | Manages `EventSource` SSE connection. Handles `sim_start`, `turn_complete`, `sim_end`, `sim_error` events. Updates all three Zustand stores. Auto-cleanup on unmount. |
+
+---
+
 ## File Reference
+
+### Backend
 
 | File | What It Does |
 |------|-------------|
 | `api/server.py` | FastAPI app factory, CORS, lifespan |
-| `api/routes.py` | HTTP endpoints (`/health`, `/world/preview`) |
+| `api/routes.py` | HTTP endpoints for health, world preview, sim CRUD |
+| `api/sse.py` | SSE pub/sub manager + streaming endpoint |
 | `config.py` | Pydantic `Settings` loaded from `.env` |
 | `db/client.py` | `connect_db`, `close_db`, `ping_db` |
 | `db/indexes.py` | MongoDB index creation |
+| `db/repositories/sim_repo.py` | Async CRUD for Simulation documents |
+| `db/repositories/event_repo.py` | Async CRUD for Event documents |
+| `db/repositories/turn_repo.py` | Async CRUD for Turn documents |
 | `models/simulation.py` | `Simulation` + `SimConfig` + `SimStatus` |
 | `models/civ_state.py` | `CivState` + `Resources` |
 | `models/event.py` | `Event` + `EventType` (21 values) |
@@ -308,6 +351,8 @@ After `check_winner`, the graph either terminates (`END`) or loops back to `incr
 | `simulation/hex_grid.py` | `Hex` dataclass, axial coords, geometry |
 | `simulation/world_state.py` | World generation, tile assignment |
 | `simulation/civilizations.py` | Civ config loader, initial states |
+| `simulation/loop.py` | LangGraph simulation state machine |
+| `simulation/judge.py` | Win condition evaluator |
 | `utils/hex_math.py` | Border detection, pathfinding, territory |
 | `utils/prompt_builder.py` | Prompt template loader + fillers |
 | `utils/llm.py` | OpenRouter API wrapper |
@@ -316,18 +361,43 @@ After `check_winner`, the graph either terminates (`END`) or loops back to `incr
 | `agents/event_agent.py` | Random world event generator |
 | `agents/narrator_agent.py` | Historical chronicle writer |
 | `agents/memory_manager.py` | Event history compression |
-| `prompts/civ_system.txt` | Civ identity + decision format (45 lines) |
-| `prompts/event_agent.txt` | World event rules + output format (36 lines) |
-| `prompts/narrator_system.txt` | Narration style guide (41 lines) |
-| `prompts/memory_system.txt` | Memory compression instructions (26 lines) |
+| `prompts/civ_system.txt` | Civ identity + decision format |
+| `prompts/event_agent.txt` | World event rules + output format |
+| `prompts/narrator_system.txt` | Narration style guide |
+| `prompts/memory_system.txt` | Memory compression instructions |
+| `scripts/smoke_test.py` | Models & DB smoke test |
+| `scripts/test_worldgen.py` | World generation test |
+| `scripts/test_openrouter.py` | LLM connectivity test |
 | `scripts/test_single_turn.py` | Full single-turn end-to-end test |
-| `simulation/loop.py` | LangGraph simulation state machine (8 nodes, conditional loop) |
-| `simulation/judge.py` | Win condition evaluator (domination/elimination/stalemate) |
-| `api/sse.py` | SSE pub/sub manager + streaming endpoint |
-| `db/repositories/` | Async CRUD for Simulation, Event, and Turn documents |
-| `frontend/src/app/page.tsx` | Dashboard with civ cards + DB status |
-| `frontend/src/lib/apiClient.ts` | Typed `apiFetch<T>` helper |
-| `frontend/src/store/*.ts` | Zustand stores (sim, event, world) |
-| `frontend/src/types/*.ts` | TypeScript definitions |
-| `configs/default_civs.json` | 4 civ definitions |
-| `configs/world_params.json` | Grid, tiles, events, win conditions |
+
+### Frontend
+
+| File | What It Does |
+|------|-------------|
+| `src/app/page.tsx` | Dashboard — hero, DB status, civ cards, start button, recent sims |
+| `src/app/history/page.tsx` | Simulation history list with winner, turn count, status |
+| `src/app/simulation/[id]/page.tsx` | Sim view — hex map, chronicle, civ panels, controls, win screen |
+| `src/components/HexGrid.tsx` | D3.js SVG hex grid with hover tooltips, animated transitions |
+| `src/components/CivPanel.tsx` | Horizontal bottom bar with all 4 civ resource/status cards |
+| `src/components/EventFeed.tsx` | Scrollable timeline of events and narrator entries |
+| `src/components/SimControls.tsx` | Turn counter, progress bar, status, stop button |
+| `src/components/WinScreen.tsx` | Victory overlay with narrative, winner, navigation |
+| `src/hooks/useEventStream.ts` | SSE connection manager, parses all event types |
+| `src/hooks/useSimulation.ts` | Start/stop simulation lifecycle actions |
+| `src/lib/apiClient.ts` | Typed API fetch wrapper |
+| `src/lib/civColors.ts` | Civ color/icon/name and tile/event constants |
+| `src/lib/hexUtils.ts` | Hex-to-pixel conversion and SVG polygon generation |
+| `src/store/simStore.ts` | Simulation metadata Zustand store |
+| `src/store/worldStore.ts` | World + civ state Zustand store |
+| `src/store/eventStore.ts` | Events + narrator log Zustand store |
+| `src/types/simulation.ts` | `Simulation`, `SimConfig`, `SimStatus` types |
+| `src/types/civilization.ts` | `CivConfig`, `CivState`, `Resources` types |
+| `src/types/world.ts` | `WorldState`, `HexTile`, `TileType`, `Turn` types |
+| `src/types/events.ts` | `SimEvent`, `EventType`, `TurnPayload` types |
+
+### Config
+
+| File | What It Does |
+|------|-------------|
+| `configs/world_params.json` | Grid size, max turns, tile yields/weights, event chance, win thresholds |
+| `configs/default_civs.json` | 4 civilizations: traits, personalities, starting resources, colors, spawn corners |
