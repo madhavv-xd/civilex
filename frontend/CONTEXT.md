@@ -124,27 +124,27 @@ graph LR
 | File | Score | Tier | Tokens |
 |------|-------|------|--------|
 | `README.md` | 0.500 | structured summary | 11 |
-| `.gitignore` | 0.267 | structured summary | 13 |
-| `src/types/index.ts` | 0.165 | full source | 37 |
-| `src/app/simulation/[id]/page.tsx` | 0.067 | structured summary | 41 |
-| `src/app/page.tsx` | 0.067 | signatures | 16 |
-| `src/app/globals.css` | 0.067 | signatures | 16 |
-| `src/app/layout.tsx` | 0.067 | signatures | 17 |
-| `package-lock.json` | 0.067 | one-liner | 12 |
-| `src/store/eventStore.ts` | 0.066 | signatures | 16 |
-| `src/store/worldStore.ts` | 0.066 | signatures | 16 |
-| `src/store/simStore.ts` | 0.066 | signatures | 17 |
-| `src/types/events.ts` | 0.065 | signatures | 15 |
-| `src/types/world.ts` | 0.065 | signatures | 15 |
-| `src/types/civilization.ts` | 0.065 | one-liner | 14 |
-| `src/types/simulation.ts` | 0.065 | one-liner | 13 |
-| `src/lib/apiClient.ts` | 0.065 | one-liner | 17 |
-| `src/app/history/page.tsx` | 0.065 | one-liner | 22 |
-| `next.config.ts` | 0.065 | one-liner | 11 |
-| `package.json` | 0.038 | one-liner | 10 |
-| `AGENTS.md` | 0.038 | one-liner | 11 |
-| `CLAUDE.md` | 0.038 | one-liner | 12 |
-| `tsconfig.json` | 0.038 | one-liner | 11 |
+| `.gitignore` | 0.111 | structured summary | 13 |
+| `src/types/index.ts` | 0.110 | full source | 37 |
+| `src/app/simulation/[id]/page.tsx` | 0.011 | structured summary | 41 |
+| `src/app/page.tsx` | 0.011 | signatures | 16 |
+| `src/app/globals.css` | 0.011 | signatures | 16 |
+| `src/app/layout.tsx` | 0.011 | signatures | 17 |
+| `package-lock.json` | 0.011 | one-liner | 12 |
+| `src/store/eventStore.ts` | 0.010 | signatures | 16 |
+| `src/store/worldStore.ts` | 0.010 | signatures | 16 |
+| `src/store/simStore.ts` | 0.010 | signatures | 17 |
+| `src/types/events.ts` | 0.010 | signatures | 15 |
+| `src/types/world.ts` | 0.010 | signatures | 15 |
+| `src/types/civilization.ts` | 0.010 | one-liner | 14 |
+| `src/types/simulation.ts` | 0.010 | one-liner | 13 |
+| `src/lib/apiClient.ts` | 0.010 | one-liner | 17 |
+| `src/app/history/page.tsx` | 0.010 | one-liner | 22 |
+| `next.config.ts` | 0.010 | one-liner | 11 |
+| `package.json` | 0.007 | one-liner | 10 |
+| `AGENTS.md` | 0.007 | one-liner | 11 |
+| `CLAUDE.md` | 0.007 | one-liner | 12 |
+| `tsconfig.json` | 0.007 | one-liner | 11 |
 | `eslint.config.mjs` | 0.000 | one-liner | 16 |
 | `postcss.config.mjs` | 0.000 | one-liner | 13 |
 | `public/file.svg` | 0.000 | one-liner | 11 |

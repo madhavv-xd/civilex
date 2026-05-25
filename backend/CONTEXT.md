@@ -2,45 +2,41 @@
 
 A python-based project composed of the following subsystems:
 
+- **simulation/**: Primary subsystem containing 6 files
+- **db/**: Primary subsystem containing 6 files
 - **models/**: Primary subsystem containing 5 files
-- **agents/**: Primary subsystem containing 5 files
-- **utils/**: Primary subsystem containing 4 files
-- **simulation/**: Primary subsystem containing 4 files
+- **scripts/**: Primary subsystem containing 5 files
 - **Root**: Contains scripts and execution points
 
 ## ENTRY_POINTS
 
-### `main.py`
-
-```python
-def main():
-    print("Hello from backend!")
-
-
-if __name__ == "__main__":
-    main()
-
-```
+*No entry points identified within budget.*
 
 ## SYMBOL_INDEX
 
 **`config.py`**
 - class `Settings`
 
-**`utils/prompt_builder.py`**
-- `load_template()`
-- `build_civ_system_prompt()`
-- `build_civ_user_message()`
-- `build_world_summary()`
-- `build_narrator_user_message()`
-- `build_event_agent_user_message()`
-- `build_memory_user_message()`
-
 **`models/civ_state.py`**
 - class `Resources`
   - `__str__()`
   - `__repr__()`
 - class `CivState`
+
+**`models/turn.py`**
+- class `TileSnapshot`
+- class `CivResourceSnapshot`
+- class `WorldSnapshot`
+- class `Turn`
+
+**`models/event.py`**
+- class `EventType`
+- class `Event`
+
+**`models/simulation.py`**
+- class `SimStatus`
+- class `SimConfig`
+- class `Simulation`
 
 **`main.py`**
 - `main()`
@@ -51,6 +47,37 @@ if __name__ == "__main__":
 - `get_civ_config()`
 - `get_civ_personality()`
 - `get_all_civ_ids()`
+
+**`db/repositories/event_repo.py`**
+- `_safe_event_type()`
+- `save_events()`
+- `get_events_for_turn()`
+- `get_events_for_sim()`
+- `get_events_as_dicts()`
+
+**`db/repositories/turn_repo.py`**
+- `_dict_to_world_snapshot()`
+- `save_turn()`
+- `get_turn()`
+- `get_all_turns()`
+
+**`db/repositories/sim_repo.py`**
+- `create_simulation()`
+- `get_simulation()`
+- `update_sim_turn()`
+- `update_sim_status()`
+- `set_sim_winner()`
+- `get_all_simulations()`
+- `is_sim_paused()`
+
+**`simulation/world_state.py`**
+- `_load_world_params()`
+- `_load_civs_config()`
+- `_pick_tile_type()`
+- `_get_resource_yield()`
+- `_assign_starting_tiles()`
+- `generate_world()`
+- `world_snapshot_to_dict()`
 
 **`simulation/hex_grid.py`**
 - class `Hex`
@@ -73,49 +100,51 @@ if __name__ == "__main__":
 - `close_db()`
 - `ping_db()`
 
-**`models/turn.py`**
-- class `TileSnapshot`
-- class `CivResourceSnapshot`
-- class `WorldSnapshot`
-- class `Turn`
+**`utils/prompt_builder.py`**
+- `load_template()`
+- `build_civ_system_prompt()`
+- `build_civ_user_message()`
+- `build_world_summary()`
+- `build_narrator_user_message()`
+- `build_event_agent_user_message()`
+- `build_memory_user_message()`
 
-**`simulation/world_state.py`**
-- `_load_world_params()`
-- `_load_civs_config()`
-- `_pick_tile_type()`
-- `_get_resource_yield()`
-- `_assign_starting_tiles()`
-- `generate_world()`
-- `world_snapshot_to_dict()`
+**`simulation/loop.py`**
+- class `SimState`
+- `_civ_doc_to_dict()`
+- `increment_turn()`
+- `run_civ_agents()`
+- `run_world_engine()`
+- `run_event_agent()`
+- `run_narrator()`
+- `refresh_memory()`
+- `persist_turn()`
+- `check_winner()`
+- `should_continue()`
+- `build_simulation_graph()`
+- `run_simulation_loop()`
 
-**`models/event.py`**
-- class `EventType`
-- class `Event`
+**`api/sse.py`**
+- class `SseManager`
+  - `__init__()`
+  - `create_channel()`
+  - `publish()`
+  - `subscribe()`
+  - `close_channel()`
+- `stream_simulation()`
 
-**`models/simulation.py`**
-- class `SimStatus`
-- class `SimConfig`
-- class `Simulation`
-
-**`agents/narrator_agent.py`**
-- `narrate_turn()`
-- `_ordinal()`
-
-**`agents/event_agent.py`**
-- `roll_world_event()`
-- `_parse_event()`
-- `_apply_event()`
-
-**`agents/civ_agent.py`**
-- `get_civ_decision()`
-- `get_all_civ_decisions()`
-- `_parse_and_validate()`
-- `_fallback_decision()`
+**`simulation/judge.py`**
+- class `WinResult`
+- `check_win()`
 
 ## IMPORTANT_CALL_PATHS
 
 main.main()
 ## CORE_MODULES
+
+### `README.md`
+
+**Purpose:** Implements README.
 
 ### `config.py`
 
@@ -123,20 +152,6 @@ main.main()
 
 **Types:**
 - `Settings` (bases: `BaseSettings`)
-
-### `README.md`
-
-**Purpose:** Implements README.
-
-### `utils/prompt_builder.py`
-
-**Purpose:** Builds prompt strings from .txt templates and world state data.
-
-**Functions:**
-- `def build_civ_system_prompt(civ_id: str, civ_name: str, traits: list[str], personality: str, ...) -> str`
-- `def build_civ_user_message(turn: int, civ_state: dict, world_summary: str, memory_summary: str) -> str`
-- `def build_event_agent_user_message(     turn: int,     world_snapshot: dict,     civ_states: dict, ) -> str`
-- `def build_memory_user_message(civ_id: str, civ_name: str, event_log: list[dict], current_state: dict) -> str`
 
 ### `models/civ_state.py`
 
@@ -146,7 +161,41 @@ main.main()
 - `CivState` (bases: `Document`)
 - `Resources` (bases: `BaseModel`) methods: `__repr__`, `__str__`
 
+### `models/turn.py`
+
+**Purpose:** Implements turn.
+
+**Types:**
+- `CivResourceSnapshot` (bases: `BaseModel`)
+- `TileSnapshot` (bases: `BaseModel`)
+- `Turn` (bases: `Document`)
+- `WorldSnapshot` (bases: `BaseModel`)
+
+### `models/event.py`
+
+**Purpose:** Implements event.
+
+**Types:**
+- `Event` (bases: `Document`)
+- `EventType` (bases: `str, Enum`)
+
+### `models/simulation.py`
+
+**Purpose:** Implements simulation.
+
+**Types:**
+- `SimConfig` (bases: `BaseModel`)
+- `SimStatus` (bases: `str, Enum`)
+- `Simulation` (bases: `Document`)
+
 ## SUPPORTING_MODULES
+
+### `main.py`
+
+```python
+def main()
+
+```
 
 ### `simulation/civilizations.py`
 
@@ -181,6 +230,140 @@ def get_civ_personality(civ_id: str) -> str
     Returns empty string if civ not found."""
 
 def get_all_civ_ids() -> list[str]
+
+```
+
+### `db/repositories/event_repo.py`
+
+> 
+Event repository — save and query simulation events.
+
+
+```python
+def _safe_event_type(type_str: str) -> EventType
+    """Safely convert string to EventType, falling back to civ_idle."""
+
+def save_events(
+    sim_id: str,
+    turn: int,
+    events: list[dict],
+) -> list[Event]
+    """Bulk insert events for a turn."""
+
+def get_events_for_turn(sim_id: str, turn: int) -> list[Event]
+    """Fetch all events for a specific turn."""
+
+def get_events_for_sim(sim_id: str) -> list[Event]
+    """Fetch full event log for a simulation."""
+
+def get_events_as_dicts(sim_id: str) -> list[dict]
+    """Fetch full event log as plain dicts for agent memory."""
+
+```
+
+### `db/repositories/turn_repo.py`
+
+> 
+Turn repository — save and query turn snapshots.
+
+
+```python
+def _dict_to_world_snapshot(world_dict: dict) -> WorldSnapshot
+    """Convert raw world dict to WorldSnapshot model."""
+
+def save_turn(
+    sim_id: str,
+    turn: int,
+    world_snapshot_dict: dict,
+) -> Turn
+    """Save a turn snapshot to MongoDB."""
+
+def get_turn(sim_id: str, turn: int) -> Turn | None
+    """Fetch a specific turn snapshot."""
+
+def get_all_turns(sim_id: str) -> list[Turn]
+    """Fetch all turns for a simulation (for replay)."""
+
+```
+
+### `db/repositories/sim_repo.py`
+
+> 
+Simulation repository — clean data access for Simulation documents.
+
+
+```python
+def create_simulation(
+    civ_ids: list[str],
+    config: SimConfig | None = None,
+) -> Simulation
+    """Create and insert a new simulation document."""
+
+def get_simulation(sim_id: str) -> Simulation | None
+    """Fetch a simulation by ID."""
+
+def update_sim_turn(sim_id: str, turn: int) -> None
+    """Update the current turn counter."""
+
+def update_sim_status(sim_id: str, status: SimStatus) -> None
+    """Update simulation status."""
+
+def set_sim_winner(
+    sim_id: str,
+    winner_id: str,
+    win_type: str,
+    final_narrative: str,
+) -> None
+    """Mark a simulation as complete with a winner."""
+
+def get_all_simulations(limit: int = 20) -> list[Simulation]
+    """Fetch recent simulations for the history page."""
+
+def is_sim_paused(sim_id: str) -> bool
+    """Check if a simulation has been paused/stopped."""
+
+```
+
+### `simulation/world_state.py`
+
+> 
+World state generator.
+Builds a fresh 15×15 hex grid with tile types, resources, and civ starting positions.
+
+
+```python
+def _load_world_params() -> dict
+
+def _load_civs_config() -> list[dict]
+
+def _pick_tile_type(params: dict, rng: random.Random) -> str
+    """Weighted random tile type selection."""
+
+def _get_resource_yield(tile_type: str, params: dict) -> tuple[float, float, float]
+    """Return (food, gold, stone) yield for a tile type."""
+
+def _assign_starting_tiles(
+    civ_id: str,
+    corner: Hex,
+    all_hex_set: set[Hex],
+    already_owned: set[Hex],
+    n: int = 3,
+) -> list[Hex]
+    """Give a civ `n` contiguous starting tiles centred on its corner.
+    Uses spiral expansion so tiles are always adjacent."""
+
+def generate_world(
+    grid_size: int | None = None,
+    seed: int | None = None,
+) -> tuple[WorldSnapshot, dict[str, list[Hex]]]
+    """Generate a fresh world.
+
+    Returns:
+        world_snapshot: WorldSnapshot — ready to store in MongoDB
+        civ_tiles: dict mapping civ_id → list of their starting Hex positions"""
+
+def world_snapshot_to_dict(snapshot: WorldSnapshot) -> dict
+    """Serialize WorldSnapshot to a plain dict for API responses."""
 
 ```
 
@@ -244,189 +427,146 @@ def ping_db() -> bool
 
 ```
 
-### `models/turn.py`
-
-```python
-class TileSnapshot(BaseModel)
-
-class CivResourceSnapshot(BaseModel)
-
-class WorldSnapshot(BaseModel)
-
-class Turn(Document)
-
-```
-
-### `.gitignore`
-
-*98 lines, 0 imports*
-
-### `simulation/world_state.py`
+### `utils/prompt_builder.py`
 
 > 
-World state generator.
-Builds a fresh 15×15 hex grid with tile types, resources, and civ starting positions.
+Builds prompt strings from .txt templates and world state data.
 
 
 ```python
-def _load_world_params() -> dict
+def load_template(filename: str) -> str
+    """Load a prompt template from the prompts/ directory."""
 
-def _load_civs_config() -> list[dict]
-
-def _pick_tile_type(params: dict, rng: random.Random) -> str
-    """Weighted random tile type selection."""
-
-def _get_resource_yield(tile_type: str, params: dict) -> tuple[float, float, float]
-    """Return (food, gold, stone) yield for a tile type."""
-
-def _assign_starting_tiles(
+def build_civ_system_prompt(
     civ_id: str,
-    corner: Hex,
-    all_hex_set: set[Hex],
-    already_owned: set[Hex],
-    n: int = 3,
-) -> list[Hex]
-    """Give a civ `n` contiguous starting tiles centred on its corner.
-    Uses spiral expansion so tiles are always adjacent."""
-
-def generate_world(
-    grid_size: int | None = None,
-    seed: int | None = None,
-) -> tuple[WorldSnapshot, dict[str, list[Hex]]]
-    """Generate a fresh world.
-
-    Returns:
-        world_snapshot: WorldSnapshot — ready to store in MongoDB
-        civ_tiles: dict mapping civ_id → list of their starting Hex positions"""
-
-def world_snapshot_to_dict(snapshot: WorldSnapshot) -> dict
-    """Serialize WorldSnapshot to a plain dict for API responses."""
-
-```
-
-### `models/event.py`
-
-```python
-class EventType(str, Enum)
-
-class Event(Document)
-
-```
-
-### `models/simulation.py`
-
-```python
-class SimStatus(str, Enum)
-
-class SimConfig(BaseModel)
-
-class Simulation(Document)
-
-```
-
-### `agents/narrator_agent.py`
-
-> 
-Narrator agent — writes 2-3 sentences of historical lore each turn.
-
-
-```python
-def narrate_turn(
-    turn: int,
-    events: list[dict],
-    world_event: dict | None = None,
+    civ_name: str,
+    traits: list[str],
+    personality: str,
+    all_civ_configs: list[dict],
 ) -> str
-    """Write a historical narrative for the turn.
+    """Build the system prompt for a civilization agent."""
 
-    Args:
-        turn: current turn number
-        events: list of resolved event dicts from world engine
-        world_event: optional world event dict from event agent
-
-    Returns:
-        narrative string (2-3 sentences of lore)"""
-
-def _ordinal(n: int) -> str
-
-```
-
-### `agents/event_agent.py`
-
-> 
-Event agent — rolls each turn for a random world event.
-20% chance per turn. Uses an LLM to pick the most dramatically interesting event.
-
-
-```python
-def roll_world_event(
-    turn: int,
-    world_snapshot: dict,
-    civ_states: dict,
-    force: bool = False,
-) -> dict | None
-    """Roll for a world event this turn.
-
-    Args:
-        turn: current turn number
-        world_snapshot: current world state
-        civ_states: current civ states
-        force: if True, always fire an event (for testing)
-
-    Returns:
-        event dict if an event fired, None otherwise"""
-
-def _parse_event(raw: str) -> dict | None
-
-def _apply_event(
-    data: dict,
-    civ_states: dict,
-    world_snapshot: dict,
-    turn: int,
-) -> dict
-    """Apply the event effects to world/civ state and return an event record."""
-
-```
-
-### `agents/civ_agent.py`
-
-> 
-Civilization agent — each civ observes the world and returns a structured decision.
-
-
-```python
-def get_civ_decision(
-    civ_id: str,
+def build_civ_user_message(
     turn: int,
     civ_state: dict,
-    all_civ_states: dict,
+    world_summary: str,
+    memory_summary: str,
+) -> str
+    """Build the user message for a civilization agent each turn."""
+
+def build_world_summary(
     world_snapshot: dict,
-    memory_summary: str = "",
-    max_retries: int = 2,
-) -> dict
-    """Ask a civilization agent what it wants to do this turn.
+    civ_states: dict,
+    exclude_civ_id: str,
+) -> str
+    """Build a compact world state summary string for injection into civ prompts.
+    Excludes the civ's own state (already shown separately)."""
 
-    Returns a validated decision dict:
-    {
-        "civ_id": str,
-        "action": str,
-        "target": str | None,
-        "reasoning": str,
-        "tone": str,
-    }"""
+def build_narrator_user_message(
+    turn: int,
+    turn_diff: dict,
+) -> str
+    """Build the user message for the narrator agent."""
 
-def get_all_civ_decisions(
+def build_event_agent_user_message(
+    turn: int,
+    world_snapshot: dict,
+    civ_states: dict,
+) -> str
+    """Build the user message for the event agent."""
+
+def build_memory_user_message(
+    civ_id: str,
+    civ_name: str,
+    event_log: list[dict],
+    current_state: dict,
+) -> str
+    """Build the user message for the memory manager."""
+
+```
+
+### `simulation/loop.py`
+
+> 
+LangGraph simulation loop.
+Defines SimState and the full turn-cycle graph:
+  increment_turn → run_civ_agents → run_world_engine → run_event_agent
+  → run_narrator → refresh_memory → persist_turn → check_winner
+  → (winner? END : back to increment_turn)
+
+
+```python
+class SimState(TypedDict)
+
+def _civ_doc_to_dict(state: CivState) -> dict
+
+def increment_turn(state: SimState) -> SimState
+
+def run_civ_agents(state: SimState) -> SimState
+
+def run_world_engine(state: SimState) -> SimState
+
+def run_event_agent(state: SimState) -> SimState
+
+def run_narrator(state: SimState) -> SimState
+
+def refresh_memory(state: SimState) -> SimState
+
+def persist_turn(state: SimState) -> SimState
+
+def check_winner(state: SimState) -> SimState
+
+def should_continue(state: SimState) -> str
+
+def build_simulation_graph() -> StateGraph
+
+def run_simulation_loop(sim_id: str) -> None
+    """Main entry point. Called as a background task from POST /api/sim/start.
+    Builds initial state from MongoDB, runs the LangGraph loop until done."""
+
+```
+
+### `db/repositories/__init__.py`
+
+*38 lines, 3 imports*
+
+### `api/sse.py`
+
+> 
+SSE manager — in-memory pub/sub for streaming simulation turn events.
+Each simulation gets its own asyncio.Queue.
+Clients connect to GET /api/sim/{id}/stream and receive events as they fire.
+
+
+```python
+class SseManager
+
+def stream_simulation(sim_id: str)
+    """SSE endpoint — streams turn events for a running simulation.
+    Connect once and receive JSON events as each turn completes."""
+
+```
+
+### `simulation/judge.py`
+
+> 
+Judge — checks win conditions after every turn.
+Returns a WinResult if someone won, None if game continues.
+
+
+```python
+class WinResult
+
+def check_win(
     turn: int,
     civ_states: dict,
     world_snapshot: dict,
-    memory_summaries: dict[str, str] | None = None,
-) -> dict[str, dict]
-    """Ask all alive civs for their decisions in parallel.
-    Returns dict mapping civ_id → decision."""
+    max_turns: int = 50,
+    domination_threshold: float = 0.60,
+) -> WinResult | None
+    """Check all win conditions for the current turn.
 
-def _parse_and_validate(raw: str, civ_id: str) -> dict | None
-    """Parse JSON response and validate it has the required fields."""
-
-def _fallback_decision(civ_id: str, action: str, reasoning: str) -> dict
+    Returns WinResult if someone won, None if game continues."""
 
 ```
 
@@ -435,128 +575,158 @@ def _fallback_decision(civ_id: str, action: str, reasoning: str) -> dict
 ```mermaid
 graph LR
     f0["config.py"]
-    f1["utils/prompt_builder.py"]
-    f2["models/civ_state.py"]
-    f3["main.py"]
-    f4["simulation/civilizations.py"]
-    f5["simulation/hex_grid.py"]
-    f6["db/client.py"]
-    f7["models/turn.py"]
-    f8[".gitignore"]
-    f9["simulation/world_state.py"]
-    f10["models/event.py"]
-    f11["models/simulation.py"]
-    f12["agents/narrator_agent.py"]
-    f13["agents/event_agent.py"]
-    f14["agents/civ_agent.py"]
-    f15["agents/world_engine.py"]
-    f16["scripts/test_single_turn.py"]
-    f17["agents/memory_manager.py"]
-    f18["pyproject.toml"]
-    f19["prompts/memory_system.txt"]
-    f20["prompts/event_agent.txt"]
-    f21["prompts/narrator_system.txt"]
-    f22["prompts/civ_system.txt"]
-    f23["models/__init__.py"]
-    f24["api/routes.py"]
+    f1["models/civ_state.py"]
+    f2["models/turn.py"]
+    f3["models/event.py"]
+    f4["models/simulation.py"]
+    f5["main.py"]
+    f6["simulation/civilizations.py"]
+    f7["db/repositories/event_repo.py"]
+    f8["db/repositories/turn_repo.py"]
+    f9["db/repositories/sim_repo.py"]
+    f10["simulation/world_state.py"]
+    f11["simulation/hex_grid.py"]
+    f12["db/client.py"]
+    f13["utils/prompt_builder.py"]
+    f14["simulation/loop.py"]
+    f15["db/repositories/__init__.py"]
+    f16["api/sse.py"]
+    f17["simulation/judge.py"]
+    f18["scripts/test_full_sim.py"]
+    f19["api/routes.py"]
+    f20["agents/narrator_agent.py"]
+    f21["agents/event_agent.py"]
+    f22["agents/civ_agent.py"]
+    f23["agents/world_engine.py"]
+    f24["simulation/__init__.py"]
+    f1 --> f0
     f2 --> f0
-    f4 --> f5
-    f4 --> f2
-    f6 --> f2
-    f6 --> f10
-    f6 --> f7
+    f3 --> f0
+    f4 --> f0
     f6 --> f11
-    f6 --> f0
-    f7 --> f0
-    f9 --> f7
-    f9 --> f5
-    f10 --> f0
-    f11 --> f0
+    f6 --> f1
+    f7 --> f3
+    f8 --> f2
+    f9 --> f4
+    f10 --> f2
+    f10 --> f11
     f12 --> f1
+    f12 --> f3
+    f12 --> f2
+    f12 --> f4
     f12 --> f0
-    f13 --> f1
-    f13 --> f0
+    f13 --> f2
+    f14 --> f8
+    f14 --> f9
+    f14 --> f7
+    f14 --> f16
     f14 --> f1
     f14 --> f4
+    f14 --> f15
+    f14 --> f6
+    f14 --> f10
+    f14 --> f17
+    f14 --> f20
+    f14 --> f21
+    f14 --> f23
+    f14 --> f22
     f14 --> f0
-    f16 --> f3
-    f16 --> f12
-    f16 --> f13
-    f16 --> f15
-    f16 --> f14
-    f16 --> f4
-    f16 --> f9
-    f16 --> f6
-    f17 --> f4
-    f17 --> f1
-    f17 --> f0
-    f23 --> f2
-    f23 --> f10
-    f23 --> f7
-    f23 --> f11
-    f24 --> f9
+    f15 --> f7
+    f15 --> f8
+    f15 --> f9
+    f18 --> f5
+    f19 --> f7
+    f19 --> f8
+    f19 --> f9
+    f19 --> f16
+    f19 --> f14
+    f19 --> f10
+    f19 --> f4
+    f19 --> f15
+    f19 --> f12
+    f20 --> f13
+    f20 --> f0
+    f21 --> f3
+    f21 --> f13
+    f21 --> f0
+    f22 --> f13
+    f22 --> f6
+    f22 --> f0
+    f24 --> f14
+    f24 --> f17
     f24 --> f6
+    f24 --> f10
+    f24 --> f11
 ```
 
 ## RANKED_FILES
 
 | File | Score | Tier | Tokens |
 |------|-------|------|--------|
-| `config.py` | 0.439 | structured summary | 26 |
-| `README.md` | 0.411 | structured summary | 11 |
-| `utils/prompt_builder.py` | 0.269 | structured summary | 152 |
-| `models/civ_state.py` | 0.257 | structured summary | 54 |
-| `main.py` | 0.245 | full source | 32 |
-| `simulation/civilizations.py` | 0.226 | signatures | 238 |
-| `simulation/hex_grid.py` | 0.226 | signatures | 396 |
-| `db/client.py` | 0.221 | signatures | 32 |
-| `models/turn.py` | 0.221 | signatures | 35 |
-| `.gitignore` | 0.206 | signatures | 13 |
-| `simulation/world_state.py` | 0.189 | signatures | 304 |
-| `models/event.py` | 0.184 | signatures | 21 |
-| `models/simulation.py` | 0.184 | signatures | 29 |
-| `agents/narrator_agent.py` | 0.170 | signatures | 132 |
-| `agents/event_agent.py` | 0.169 | signatures | 204 |
-| `agents/civ_agent.py` | 0.169 | signatures | 271 |
-| `agents/world_engine.py` | 0.168 | one-liner | 9 |
-| `scripts/test_single_turn.py` | 0.150 | one-liner | 10 |
-| `agents/memory_manager.py` | 0.125 | one-liner | 9 |
-| `pyproject.toml` | 0.100 | one-liner | 12 |
-| `prompts/memory_system.txt` | 0.099 | one-liner | 13 |
-| `prompts/event_agent.txt` | 0.099 | one-liner | 13 |
-| `prompts/narrator_system.txt` | 0.099 | one-liner | 15 |
-| `prompts/civ_system.txt` | 0.099 | one-liner | 14 |
-| `models/__init__.py` | 0.075 | one-liner | 17 |
-| `api/routes.py` | 0.072 | one-liner | 19 |
-| `utils/hex_math.py` | 0.072 | one-liner | 10 |
-| `db/indexes.py` | 0.067 | one-liner | 20 |
-| `scripts/test_worldgen.py` | 0.061 | one-liner | 10 |
-| `scripts/smoke_test.py` | 0.056 | one-liner | 10 |
-| `utils/llm.py` | 0.056 | one-liner | 21 |
-| `simulation/__init__.py` | 0.035 | one-liner | 17 |
-| `api/server.py` | 0.031 | one-liner | 19 |
-| `utils/__init__.py` | 0.030 | one-liner | 17 |
-| `scripts/test_openrouter.py` | 0.006 | one-liner | 21 |
-| `.python-version` | 0.000 | one-liner | 10 |
+| `README.md` | 0.500 | structured summary | 11 |
+| `config.py` | 0.437 | structured summary | 26 |
+| `models/civ_state.py` | 0.304 | structured summary | 54 |
+| `models/turn.py` | 0.304 | structured summary | 65 |
+| `models/event.py` | 0.270 | structured summary | 38 |
+| `models/simulation.py` | 0.270 | structured summary | 52 |
+| `main.py` | 0.267 | signatures | 13 |
+| `simulation/civilizations.py` | 0.240 | signatures | 238 |
+| `db/repositories/event_repo.py` | 0.223 | signatures | 173 |
+| `db/repositories/turn_repo.py` | 0.223 | signatures | 140 |
+| `db/repositories/sim_repo.py` | 0.223 | signatures | 228 |
+| `simulation/world_state.py` | 0.207 | signatures | 304 |
+| `simulation/hex_grid.py` | 0.207 | signatures | 396 |
+| `db/client.py` | 0.204 | signatures | 32 |
+| `utils/prompt_builder.py` | 0.204 | signatures | 330 |
+| `simulation/loop.py` | 0.190 | signatures | 264 |
+| `db/repositories/__init__.py` | 0.185 | signatures | 18 |
+| `api/sse.py` | 0.185 | signatures | 94 |
+| `simulation/judge.py` | 0.185 | signatures | 113 |
+| `scripts/test_full_sim.py` | 0.181 | one-liner | 10 |
+| `api/routes.py` | 0.156 | one-liner | 8 |
+| `agents/narrator_agent.py` | 0.146 | one-liner | 11 |
+| `agents/event_agent.py` | 0.146 | one-liner | 9 |
+| `agents/civ_agent.py` | 0.146 | one-liner | 10 |
+| `agents/world_engine.py` | 0.145 | one-liner | 9 |
+| `simulation/__init__.py` | 0.123 | one-liner | 17 |
+| `agents/memory_manager.py` | 0.104 | one-liner | 9 |
+| `.gitignore` | 0.104 | one-liner | 10 |
+| `utils/hex_math.py` | 0.098 | one-liner | 10 |
+| `scripts/test_single_turn.py` | 0.096 | one-liner | 10 |
+| `models/__init__.py` | 0.070 | one-liner | 17 |
+| `db/indexes.py` | 0.062 | one-liner | 20 |
+| `scripts/test_worldgen.py` | 0.057 | one-liner | 10 |
+| `scripts/smoke_test.py` | 0.054 | one-liner | 10 |
+| `utils/llm.py` | 0.054 | one-liner | 21 |
+| `pyproject.toml` | 0.046 | one-liner | 12 |
+| `prompts/memory_system.txt` | 0.045 | one-liner | 13 |
+| `prompts/event_agent.txt` | 0.045 | one-liner | 13 |
+| `prompts/narrator_system.txt` | 0.045 | one-liner | 15 |
+| `prompts/civ_system.txt` | 0.045 | one-liner | 14 |
 
 ## PERIPHERY
 
+- `scripts/test_full_sim.py` — 
+- `api/routes.py` — 
+- `agents/narrator_agent.py` — 
+- `agents/event_agent.py` — 
+- `agents/civ_agent.py` — 
 - `agents/world_engine.py` — 
-- `scripts/test_single_turn.py` — 
+- `simulation/__init__.py` — 5 imports, 13 lines
 - `agents/memory_manager.py` — 
+- `.gitignore` — 98 lines
+- `utils/hex_math.py` — 
+- `scripts/test_single_turn.py` — 
+- `models/__init__.py` — 4 imports, 11 lines
+- `db/indexes.py` — 1 function, 5 imports, 22 lines
+- `scripts/test_worldgen.py` — 
+- `scripts/smoke_test.py` — 
+- `utils/llm.py` — 1 function, 5 imports, 65 lines
 - `pyproject.toml` — 36 lines
 - `prompts/memory_system.txt` — 26 lines
 - `prompts/event_agent.txt` — 36 lines
 - `prompts/narrator_system.txt` — 41 lines
 - `prompts/civ_system.txt` — 45 lines
-- `models/__init__.py` — 4 imports, 11 lines
-- `api/routes.py` — 3 functions, 3 imports, 49 lines
-- `utils/hex_math.py` — 
-- `db/indexes.py` — 1 function, 5 imports, 22 lines
-- `scripts/test_worldgen.py` — 
-- `scripts/smoke_test.py` — 
-- `utils/llm.py` — 1 function, 5 imports, 65 lines
-- `simulation/__init__.py` — 3 imports, 9 lines
 - `api/server.py` — 1 function, 8 imports, 42 lines
 - `utils/__init__.py` — 1 imports, 14 lines
 - `scripts/test_openrouter.py` — 1 function, 4 imports, 61 lines

@@ -2,7 +2,7 @@
 
 A software project composed of the following subsystems:
 
-- **backend/**: Primary subsystem containing 37 files
+- **backend/**: Primary subsystem containing 45 files
 - **frontend/**: Primary subsystem containing 31 files
 - **configs/**: Primary subsystem containing 2 files
 - **Root**: Contains scripts and execution points
@@ -34,6 +34,18 @@ if __name__ == "__main__":
 - class `SimConfig`
 - class `Simulation`
 
+**`backend/api/routes.py`**
+- `health()`
+- `world_preview()`
+- class `StartSimRequest`
+- `start_simulation()`
+- `stop_simulation()`
+- `get_sim()`
+- `get_sim_events()`
+- `get_sim_turns()`
+- `list_simulations()`
+- `_tile_distribution()`
+
 **`backend/main.py`**
 - `main()`
 
@@ -43,14 +55,9 @@ if __name__ == "__main__":
 - class `WorldSnapshot`
 - class `Turn`
 
-**`backend/utils/prompt_builder.py`**
-- `load_template()`
-- `build_civ_system_prompt()`
-- `build_civ_user_message()`
-- `build_world_summary()`
-- `build_narrator_user_message()`
-- `build_event_agent_user_message()`
-- `build_memory_user_message()`
+**`backend/models/event.py`**
+- class `EventType`
+- class `Event`
 
 **`backend/simulation/civilizations.py`**
 - `load_civs_config()`
@@ -80,14 +87,14 @@ if __name__ == "__main__":
 - `close_db()`
 - `ping_db()`
 
-**`backend/models/event.py`**
-- class `EventType`
-- class `Event`
-
-**`backend/api/routes.py`**
-- `health()`
-- `world_preview()`
-- `_tile_distribution()`
+**`backend/utils/prompt_builder.py`**
+- `load_template()`
+- `build_civ_system_prompt()`
+- `build_civ_user_message()`
+- `build_world_summary()`
+- `build_narrator_user_message()`
+- `build_event_agent_user_message()`
+- `build_memory_user_message()`
 
 **`backend/simulation/world_state.py`**
 - `_load_world_params()`
@@ -101,8 +108,49 @@ if __name__ == "__main__":
 **`backend/config.py`**
 - class `Settings`
 
+**`backend/db/repositories/event_repo.py`**
+- `_safe_event_type()`
+- `save_events()`
+- `get_events_for_turn()`
+- `get_events_for_sim()`
+- `get_events_as_dicts()`
+
+**`backend/db/repositories/sim_repo.py`**
+- `create_simulation()`
+- `get_simulation()`
+- `update_sim_turn()`
+- `update_sim_status()`
+- `set_sim_winner()`
+- `get_all_simulations()`
+- `is_sim_paused()`
+
+**`backend/db/repositories/turn_repo.py`**
+- `_dict_to_world_snapshot()`
+- `save_turn()`
+- `get_turn()`
+- `get_all_turns()`
+
+**`backend/simulation/loop.py`**
+- class `SimState`
+- `_civ_doc_to_dict()`
+- `increment_turn()`
+- `run_civ_agents()`
+- `run_world_engine()`
+- `run_event_agent()`
+- `run_narrator()`
+- `refresh_memory()`
+- `persist_turn()`
+- `check_winner()`
+- `should_continue()`
+- `build_simulation_graph()`
+- `run_simulation_loop()`
+
 **`frontend/src/app/page.tsx`**
 - `HomePage()`
+
+**`backend/simulation/judge.py`**
+- class `WinResult`
+- `check_win()`
 
 **`backend/agents/civ_agent.py`**
 - `get_civ_decision()`
@@ -133,11 +181,6 @@ if __name__ == "__main__":
 - `_apply_resource_tick()`
 - `_sync_tile_counts()`
 
-**`backend/agents/memory_manager.py`**
-- `get_memory_summary()`
-- `refresh_all_memories()`
-- `should_refresh()`
-
 **`backend/utils/hex_math.py`**
 - `get_tiles_in_range()`
 - `get_border_tiles()`
@@ -147,8 +190,19 @@ if __name__ == "__main__":
 - `tiles_owned_by()`
 - `domination_percentage()`
 
-**`frontend/src/app/simulation/[id]/page.tsx`**
-- `SimulationPage()`
+**`backend/agents/memory_manager.py`**
+- `get_memory_summary()`
+- `refresh_all_memories()`
+- `should_refresh()`
+
+**`backend/api/sse.py`**
+- class `SseManager`
+  - `__init__()`
+  - `create_channel()`
+  - `publish()`
+  - `subscribe()`
+  - `close_channel()`
+- `stream_simulation()`
 
 ## IMPORTANT_CALL_PATHS
 
@@ -172,11 +226,31 @@ main.main()
 - `SimStatus` (bases: `str, Enum`)
 - `Simulation` (bases: `Document`)
 
-### `backend/CONTEXT.md`
+### `backend/api/routes.py`
 
-**Purpose:** Implements CONTEXT.
+**Purpose:** FastAPI routes — all API endpoints.
 
-**Notes:** large file (565 lines)
+**Types:**
+- `StartSimRequest` (bases: `BaseModel`)
+
+**Functions:**
+- `def _tile_distribution(tiles: list[dict]) -> dict[str, int]`
+- `def get_sim(sim_id: str)`
+- `def get_sim_events(sim_id: str, turn: int | None = None)`
+- `def get_sim_turns(sim_id: str)`
+- `def health()`
+- `def list_simulations()`
+- `def start_simulation(req: StartSimRequest, background_tasks: BackgroundTasks)`
+- `def stop_simulation(sim_id: str)`
+- `def world_preview(grid_size: int = 15, seed: int | None = None)`
+
+**Notes:** decorator-heavy (8 decorators)
+
+### `README.md`
+
+**Purpose:** Implements README.
+
+**Notes:** large file (332 lines)
 
 ### `backend/models/turn.py`
 
@@ -188,15 +262,19 @@ main.main()
 - `Turn` (bases: `Document`)
 - `WorldSnapshot` (bases: `BaseModel`)
 
-### `backend/utils/prompt_builder.py`
+### `backend/models/event.py`
 
-**Purpose:** Builds prompt strings from .txt templates and world state data.
+**Purpose:** Implements event.
 
-**Functions:**
-- `def build_civ_system_prompt(civ_id: str, civ_name: str, traits: list[str], personality: str, ...) -> str`
-- `def build_civ_user_message(turn: int, civ_state: dict, world_summary: str, memory_summary: str) -> str`
-- `def build_event_agent_user_message(     turn: int,     world_snapshot: dict,     civ_states: dict, ) -> str`
-- `def build_memory_user_message(civ_id: str, civ_name: str, event_log: list[dict], current_state: dict) -> str`
+**Types:**
+- `Event` (bases: `Document`)
+- `EventType` (bases: `str, Enum`)
+
+### `backend/CONTEXT.md`
+
+**Purpose:** Implements CONTEXT.
+
+**Notes:** large file (565 lines)
 
 ### `backend/simulation/civilizations.py`
 
@@ -243,32 +321,69 @@ HEX_DIRECTIONS = <complex expression>
 - `def connect_db() -> None`
 - `def ping_db() -> bool`
 
-### `backend/models/event.py`
-
-**Purpose:** Implements event.
-
-**Types:**
-- `Event` (bases: `Document`)
-- `EventType` (bases: `str, Enum`)
-
 ## SUPPORTING_MODULES
 
-### `backend/api/routes.py`
+### `backend/utils/prompt_builder.py`
+
+> 
+Builds prompt strings from .txt templates and world state data.
+
 
 ```python
-def health()
+def load_template(filename: str) -> str
+    """Load a prompt template from the prompts/ directory."""
 
-def world_preview(grid_size: int = 15, seed: int | None = None)
-    """Generate and return a fresh world without saving to DB.
-    Useful for verifying world generation before wiring up the frontend map."""
+def build_civ_system_prompt(
+    civ_id: str,
+    civ_name: str,
+    traits: list[str],
+    personality: str,
+    all_civ_configs: list[dict],
+) -> str
+    """Build the system prompt for a civilization agent."""
 
-def _tile_distribution(tiles: list[dict]) -> dict[str, int]
+def build_civ_user_message(
+    turn: int,
+    civ_state: dict,
+    world_summary: str,
+    memory_summary: str,
+) -> str
+    """Build the user message for a civilization agent each turn."""
+
+def build_world_summary(
+    world_snapshot: dict,
+    civ_states: dict,
+    exclude_civ_id: str,
+) -> str
+    """Build a compact world state summary string for injection into civ prompts.
+    Excludes the civ's own state (already shown separately)."""
+
+def build_narrator_user_message(
+    turn: int,
+    turn_diff: dict,
+) -> str
+    """Build the user message for the narrator agent."""
+
+def build_event_agent_user_message(
+    turn: int,
+    world_snapshot: dict,
+    civ_states: dict,
+) -> str
+    """Build the user message for the event agent."""
+
+def build_memory_user_message(
+    civ_id: str,
+    civ_name: str,
+    event_log: list[dict],
+    current_state: dict,
+) -> str
+    """Build the user message for the memory manager."""
 
 ```
 
-### `frontend/CONTEXT.md`
+### `backend/simulation/__init__.py`
 
-*176 lines, 0 imports*
+*13 lines, 5 imports*
 
 ### `backend/simulation/world_state.py`
 
@@ -320,12 +435,171 @@ class Settings(BaseSettings)
 
 ```
 
+### `backend/db/repositories/event_repo.py`
+
+> 
+Event repository — save and query simulation events.
+
+
+```python
+def _safe_event_type(type_str: str) -> EventType
+    """Safely convert string to EventType, falling back to civ_idle."""
+
+def save_events(
+    sim_id: str,
+    turn: int,
+    events: list[dict],
+) -> list[Event]
+    """Bulk insert events for a turn."""
+
+def get_events_for_turn(sim_id: str, turn: int) -> list[Event]
+    """Fetch all events for a specific turn."""
+
+def get_events_for_sim(sim_id: str) -> list[Event]
+    """Fetch full event log for a simulation."""
+
+def get_events_as_dicts(sim_id: str) -> list[dict]
+    """Fetch full event log as plain dicts for agent memory."""
+
+```
+
+### `backend/db/repositories/sim_repo.py`
+
+> 
+Simulation repository — clean data access for Simulation documents.
+
+
+```python
+def create_simulation(
+    civ_ids: list[str],
+    config: SimConfig | None = None,
+) -> Simulation
+    """Create and insert a new simulation document."""
+
+def get_simulation(sim_id: str) -> Simulation | None
+    """Fetch a simulation by ID."""
+
+def update_sim_turn(sim_id: str, turn: int) -> None
+    """Update the current turn counter."""
+
+def update_sim_status(sim_id: str, status: SimStatus) -> None
+    """Update simulation status."""
+
+def set_sim_winner(
+    sim_id: str,
+    winner_id: str,
+    win_type: str,
+    final_narrative: str,
+) -> None
+    """Mark a simulation as complete with a winner."""
+
+def get_all_simulations(limit: int = 20) -> list[Simulation]
+    """Fetch recent simulations for the history page."""
+
+def is_sim_paused(sim_id: str) -> bool
+    """Check if a simulation has been paused/stopped."""
+
+```
+
+### `backend/db/repositories/turn_repo.py`
+
+> 
+Turn repository — save and query turn snapshots.
+
+
+```python
+def _dict_to_world_snapshot(world_dict: dict) -> WorldSnapshot
+    """Convert raw world dict to WorldSnapshot model."""
+
+def save_turn(
+    sim_id: str,
+    turn: int,
+    world_snapshot_dict: dict,
+) -> Turn
+    """Save a turn snapshot to MongoDB."""
+
+def get_turn(sim_id: str, turn: int) -> Turn | None
+    """Fetch a specific turn snapshot."""
+
+def get_all_turns(sim_id: str) -> list[Turn]
+    """Fetch all turns for a simulation (for replay)."""
+
+```
+
+### `backend/simulation/loop.py`
+
+> 
+LangGraph simulation loop.
+Defines SimState and the full turn-cycle graph:
+  increment_turn → run_civ_agents → run_world_engine → run_event_agent
+  → run_narrator → refresh_memory → persist_turn → check_winner
+  → (winner? END : back to increment_turn)
+
+
+```python
+class SimState(TypedDict)
+
+def _civ_doc_to_dict(state: CivState) -> dict
+
+def increment_turn(state: SimState) -> SimState
+
+def run_civ_agents(state: SimState) -> SimState
+
+def run_world_engine(state: SimState) -> SimState
+
+def run_event_agent(state: SimState) -> SimState
+
+def run_narrator(state: SimState) -> SimState
+
+def refresh_memory(state: SimState) -> SimState
+
+def persist_turn(state: SimState) -> SimState
+
+def check_winner(state: SimState) -> SimState
+
+def should_continue(state: SimState) -> str
+
+def build_simulation_graph() -> StateGraph
+
+def run_simulation_loop(sim_id: str) -> None
+    """Main entry point. Called as a background task from POST /api/sim/start.
+    Builds initial state from MongoDB, runs the LangGraph loop until done."""
+
+```
+
 ### `frontend/src/app/page.tsx`
 
 ```typescript
 function HomePage()
 
 ```
+
+### `backend/simulation/judge.py`
+
+> 
+Judge — checks win conditions after every turn.
+Returns a WinResult if someone won, None if game continues.
+
+
+```python
+class WinResult
+
+def check_win(
+    turn: int,
+    civ_states: dict,
+    world_snapshot: dict,
+    max_turns: int = 50,
+    domination_threshold: float = 0.60,
+) -> WinResult | None
+    """Check all win conditions for the current turn.
+
+    Returns WinResult if someone won, None if game continues."""
+
+```
+
+### `frontend/CONTEXT.md`
+
+*176 lines, 0 imports*
 
 ### `backend/agents/civ_agent.py`
 
@@ -527,59 +801,6 @@ def _sync_tile_counts(civ_states: dict, world: dict) -> None
 
 ```
 
-### `README.md`
-
-*234 lines, 0 imports*
-
-### `frontend/next.config.ts`
-
-*8 lines, 0 imports*
-
-### `backend/agents/memory_manager.py`
-
-> 
-Memory manager — compresses each civ's event history into a short
-memory summary injected into their agent prompt each turn.
-
-
-```python
-def get_memory_summary(
-    civ_id: str,
-    event_log: list[dict],
-    current_state: dict,
-) -> str
-    """Compress a civ's event history into a 3-sentence memory summary.
-
-    Args:
-        civ_id: the civilization ID
-        event_log: full event log filtered/unfiltered
-        current_state: current CivState dict
-
-    Returns:
-        memory summary string"""
-
-def refresh_all_memories(
-    turn: int,
-    civ_states: dict,
-    event_log: list[dict],
-    existing_summaries: dict[str, str],
-) -> dict[str, str]
-    """Refresh memory summaries for all alive civs.
-    Only runs every COMPRESS_EVERY turns to save API calls.
-
-    Args:
-        turn: current turn number
-        civ_states: current civ states
-        event_log: full simulation event log so far
-        existing_summaries: previous memory summaries
-
-    Returns:
-        updated memory summaries dict"""
-
-def should_refresh(turn: int) -> bool
-
-```
-
 ### `backend/utils/hex_math.py`
 
 > 
@@ -626,30 +847,77 @@ def domination_percentage(
 
 ```
 
+### `backend/db/repositories/__init__.py`
+
+*38 lines, 3 imports*
+
+### `frontend/next.config.ts`
+
+*8 lines, 0 imports*
+
 ### `frontend/src/types/index.ts`
 
 *4 lines, 0 imports*
 
-### `backend/prompts/civ_system.txt`
+### `backend/agents/memory_manager.py`
 
-*45 lines, 0 imports*
+> 
+Memory manager — compresses each civ's event history into a short
+memory summary injected into their agent prompt each turn.
 
-### `backend/prompts/event_agent.txt`
 
-*36 lines, 0 imports*
+```python
+def get_memory_summary(
+    civ_id: str,
+    event_log: list[dict],
+    current_state: dict,
+) -> str
+    """Compress a civ's event history into a 3-sentence memory summary.
 
-### `backend/prompts/memory_system.txt`
+    Args:
+        civ_id: the civilization ID
+        event_log: full event log filtered/unfiltered
+        current_state: current CivState dict
 
-*26 lines, 0 imports*
+    Returns:
+        memory summary string"""
 
-### `backend/prompts/narrator_system.txt`
+def refresh_all_memories(
+    turn: int,
+    civ_states: dict,
+    event_log: list[dict],
+    existing_summaries: dict[str, str],
+) -> dict[str, str]
+    """Refresh memory summaries for all alive civs.
+    Only runs every COMPRESS_EVERY turns to save API calls.
 
-*41 lines, 0 imports*
+    Args:
+        turn: current turn number
+        civ_states: current civ states
+        event_log: full simulation event log so far
+        existing_summaries: previous memory summaries
 
-### `frontend/src/app/simulation/[id]/page.tsx`
+    Returns:
+        updated memory summaries dict"""
 
-```typescript
-function SimulationPage({ params }: { params: { id: string } })
+def should_refresh(turn: int) -> bool
+
+```
+
+### `backend/api/sse.py`
+
+> 
+SSE manager — in-memory pub/sub for streaming simulation turn events.
+Each simulation gets its own asyncio.Queue.
+Clients connect to GET /api/sim/{id}/stream and receive events as they fire.
+
+
+```python
+class SseManager
+
+def stream_simulation(sim_id: str)
+    """SSE endpoint — streams turn events for a running simulation.
+    Connect once and receive JSON events as each turn completes."""
 
 ```
 
@@ -659,122 +927,143 @@ function SimulationPage({ params }: { params: { id: string } })
 graph LR
     f0["backend/models/civ_state.py"]
     f1["backend/models/simulation.py"]
-    f2["backend/main.py"]
-    f3["backend/pyproject.toml"]
+    f2["backend/api/routes.py"]
+    f3["backend/main.py"]
     f4["backend/models/turn.py"]
-    f5["backend/utils/prompt_builder.py"]
+    f5["backend/models/event.py"]
     f6["backend/simulation/civilizations.py"]
     f7["backend/simulation/hex_grid.py"]
     f8["backend/db/client.py"]
-    f9["backend/models/event.py"]
-    f10["backend/api/routes.py"]
-    f11["backend/simulation/world_state.py"]
-    f12["backend/config.py"]
-    f13["frontend/src/app/page.tsx"]
-    f14["backend/agents/civ_agent.py"]
-    f15["backend/agents/event_agent.py"]
-    f16["backend/agents/narrator_agent.py"]
-    f17["backend/agents/world_engine.py"]
-    f18["backend/scripts/test_single_turn.py"]
-    f19["frontend/next.config.ts"]
-    f20["backend/agents/memory_manager.py"]
-    f21["backend/scripts/test_openrouter.py"]
-    f22["backend/utils/hex_math.py"]
-    f23["frontend/src/types/index.ts"]
-    f24["backend/prompts/civ_system.txt"]
-    f0 --> f12
-    f1 --> f12
-    f4 --> f12
+    f9["backend/pyproject.toml"]
+    f10["backend/utils/prompt_builder.py"]
+    f11["backend/simulation/__init__.py"]
+    f12["backend/simulation/world_state.py"]
+    f13["backend/config.py"]
+    f14["backend/db/repositories/event_repo.py"]
+    f15["backend/db/repositories/sim_repo.py"]
+    f16["backend/db/repositories/turn_repo.py"]
+    f17["backend/simulation/loop.py"]
+    f18["frontend/src/app/page.tsx"]
+    f19["backend/simulation/judge.py"]
+    f20["backend/scripts/test_full_sim.py"]
+    f21["backend/agents/civ_agent.py"]
+    f22["backend/agents/event_agent.py"]
+    f23["backend/agents/narrator_agent.py"]
+    f24["backend/agents/world_engine.py"]
+    f0 --> f13
+    f1 --> f13
+    f2 --> f17
+    f2 --> f8
+    f2 --> f14
+    f2 --> f16
+    f2 --> f12
+    f2 --> f15
+    f2 --> f1
+    f4 --> f13
+    f5 --> f13
     f6 --> f7
     f6 --> f0
     f8 --> f4
     f8 --> f1
-    f8 --> f9
+    f8 --> f5
     f8 --> f0
-    f9 --> f12
-    f10 --> f8
-    f10 --> f11
+    f10 --> f4
+    f11 --> f12
+    f11 --> f6
+    f11 --> f19
+    f11 --> f17
     f11 --> f7
-    f11 --> f4
-    f13 --> f2
-    f13 --> f10
-    f13 --> f1
-    f14 --> f6
+    f12 --> f7
+    f12 --> f4
     f14 --> f5
-    f15 --> f5
-    f16 --> f5
-    f18 --> f15
-    f18 --> f17
-    f18 --> f16
+    f15 --> f1
+    f16 --> f4
+    f17 --> f16
+    f17 --> f22
+    f17 --> f24
+    f17 --> f23
+    f17 --> f15
+    f17 --> f14
+    f17 --> f21
+    f17 --> f12
+    f17 --> f19
+    f17 --> f6
+    f17 --> f0
+    f18 --> f3
     f18 --> f2
-    f18 --> f14
-    f18 --> f11
-    f18 --> f8
-    f18 --> f6
-    f20 --> f6
-    f20 --> f5
-    f22 --> f7
+    f18 --> f1
+    f20 --> f3
+    f21 --> f6
+    f21 --> f10
+    f22 --> f10
+    f22 --> f5
+    f23 --> f10
 ```
 
 ## RANKED_FILES
 
 | File | Score | Tier | Tokens |
 |------|-------|------|--------|
-| `backend/models/civ_state.py` | 0.573 | structured summary | 55 |
-| `backend/models/simulation.py` | 0.573 | structured summary | 53 |
-| `backend/CONTEXT.md` | 0.550 | structured summary | 22 |
-| `backend/main.py` | 0.524 | full source | 33 |
-| `backend/pyproject.toml` | 0.500 | one-liner | 13 |
-| `backend/models/turn.py` | 0.463 | structured summary | 66 |
-| `backend/utils/prompt_builder.py` | 0.448 | structured summary | 153 |
-| `backend/simulation/civilizations.py` | 0.432 | structured summary | 193 |
-| `backend/simulation/hex_grid.py` | 0.432 | structured summary | 165 |
-| `backend/db/client.py` | 0.427 | structured summary | 44 |
-| `backend/models/event.py` | 0.427 | structured summary | 39 |
-| `backend/api/routes.py` | 0.420 | signatures | 77 |
-| `frontend/CONTEXT.md` | 0.397 | signatures | 15 |
-| `backend/simulation/world_state.py` | 0.396 | signatures | 306 |
-| `backend/config.py` | 0.391 | signatures | 16 |
-| `frontend/src/app/page.tsx` | 0.359 | signatures | 17 |
-| `backend/agents/civ_agent.py` | 0.339 | signatures | 273 |
-| `backend/agents/event_agent.py` | 0.339 | signatures | 206 |
-| `backend/agents/narrator_agent.py` | 0.339 | signatures | 134 |
-| `backend/agents/world_engine.py` | 0.303 | signatures | 582 |
-| `README.md` | 0.302 | signatures | 13 |
-| `backend/scripts/test_single_turn.py` | 0.283 | one-liner | 11 |
-| `frontend/next.config.ts` | 0.273 | signatures | 16 |
-| `backend/agents/memory_manager.py` | 0.258 | signatures | 250 |
-| `backend/scripts/test_openrouter.py` | 0.245 | one-liner | 22 |
-| `backend/utils/hex_math.py` | 0.242 | signatures | 331 |
-| `frontend/src/types/index.ts` | 0.239 | signatures | 16 |
-| `backend/prompts/civ_system.txt` | 0.233 | signatures | 18 |
-| `backend/prompts/event_agent.txt` | 0.233 | signatures | 17 |
-| `backend/prompts/memory_system.txt` | 0.233 | signatures | 17 |
-| `backend/prompts/narrator_system.txt` | 0.233 | signatures | 19 |
-| `frontend/src/app/simulation/[id]/page.tsx` | 0.226 | signatures | 34 |
-| `backend/api/server.py` | 0.201 | one-liner | 20 |
-| `backend/db/indexes.py` | 0.201 | one-liner | 21 |
-| `frontend/src/lib/apiClient.ts` | 0.201 | one-liner | 18 |
-| `frontend/src/app/layout.tsx` | 0.195 | one-liner | 22 |
-| `backend/scripts/test_worldgen.py` | 0.194 | one-liner | 11 |
-| `backend/scripts/smoke_test.py` | 0.189 | one-liner | 11 |
-| `backend/utils/llm.py` | 0.189 | one-liner | 22 |
-| `frontend/src/app/history/page.tsx` | 0.189 | one-liner | 23 |
+| `backend/models/civ_state.py` | 0.537 | structured summary | 55 |
+| `backend/models/simulation.py` | 0.537 | structured summary | 53 |
+| `backend/api/routes.py` | 0.526 | structured summary | 173 |
+| `README.md` | 0.525 | structured summary | 20 |
+| `backend/main.py` | 0.477 | full source | 33 |
+| `backend/models/turn.py` | 0.476 | structured summary | 66 |
+| `backend/models/event.py` | 0.445 | structured summary | 39 |
+| `backend/CONTEXT.md` | 0.396 | structured summary | 22 |
+| `backend/simulation/civilizations.py` | 0.386 | structured summary | 193 |
+| `backend/simulation/hex_grid.py` | 0.356 | structured summary | 165 |
+| `backend/db/client.py` | 0.352 | structured summary | 44 |
+| `backend/pyproject.toml` | 0.346 | one-liner | 13 |
+| `backend/utils/prompt_builder.py` | 0.333 | signatures | 331 |
+| `backend/simulation/__init__.py` | 0.325 | signatures | 18 |
+| `backend/simulation/world_state.py` | 0.325 | signatures | 306 |
+| `backend/config.py` | 0.322 | signatures | 16 |
+| `backend/db/repositories/event_repo.py` | 0.317 | signatures | 174 |
+| `backend/db/repositories/sim_repo.py` | 0.317 | signatures | 229 |
+| `backend/db/repositories/turn_repo.py` | 0.317 | signatures | 141 |
+| `backend/simulation/loop.py` | 0.317 | signatures | 266 |
+| `frontend/src/app/page.tsx` | 0.285 | signatures | 17 |
+| `backend/simulation/judge.py` | 0.282 | signatures | 115 |
+| `backend/scripts/test_full_sim.py` | 0.281 | one-liner | 11 |
+| `frontend/CONTEXT.md` | 0.278 | signatures | 15 |
+| `backend/agents/civ_agent.py` | 0.272 | signatures | 273 |
+| `backend/agents/event_agent.py` | 0.272 | signatures | 206 |
+| `backend/agents/narrator_agent.py` | 0.272 | signatures | 134 |
+| `backend/agents/world_engine.py` | 0.241 | signatures | 582 |
+| `backend/utils/hex_math.py` | 0.224 | signatures | 331 |
+| `backend/db/repositories/__init__.py` | 0.220 | signatures | 19 |
+| `frontend/next.config.ts` | 0.204 | signatures | 16 |
+| `frontend/src/types/index.ts` | 0.204 | signatures | 16 |
+| `backend/agents/memory_manager.py` | 0.202 | signatures | 250 |
+| `backend/api/sse.py` | 0.200 | signatures | 95 |
+| `backend/scripts/test_openrouter.py` | 0.199 | one-liner | 22 |
+| `backend/scripts/test_single_turn.py` | 0.196 | one-liner | 11 |
+| `frontend/src/app/simulation/[id]/page.tsx` | 0.185 | one-liner | 23 |
+| `backend/api/server.py` | 0.160 | one-liner | 20 |
+| `backend/db/indexes.py` | 0.160 | one-liner | 21 |
+| `frontend/src/lib/apiClient.ts` | 0.160 | one-liner | 18 |
 
 ## PERIPHERY
 
 - `backend/pyproject.toml` — 36 lines
-- `backend/scripts/test_single_turn.py` — 
+- `backend/scripts/test_full_sim.py` — 
 - `backend/scripts/test_openrouter.py` — 1 function, 4 imports, 61 lines
+- `backend/scripts/test_single_turn.py` — 
+- `frontend/src/app/simulation/[id]/page.tsx` — 1 function, 12 lines
 - `backend/api/server.py` — 1 function, 8 imports, 42 lines
 - `backend/db/indexes.py` — 1 function, 5 imports, 22 lines
 - `frontend/src/lib/apiClient.ts` — 1 function, 20 lines
-- `frontend/src/app/layout.tsx` — 1 function, 3 imports, 34 lines
 - `backend/scripts/test_worldgen.py` — 
+- `frontend/src/app/layout.tsx` — 1 function, 3 imports, 34 lines
 - `backend/scripts/smoke_test.py` — 
 - `backend/utils/llm.py` — 1 function, 5 imports, 65 lines
 - `frontend/src/app/history/page.tsx` — 1 function, 1 imports, 17 lines
-- `backend/simulation/__init__.py` — 3 imports, 9 lines
+- `backend/prompts/civ_system.txt` — 45 lines
+- `backend/prompts/event_agent.txt` — 36 lines
+- `backend/prompts/memory_system.txt` — 26 lines
+- `backend/prompts/narrator_system.txt` — 41 lines
 - `backend/models/__init__.py` — 4 imports, 11 lines
 - `frontend/src/store/simStore.ts` — 2 imports, 27 lines
 - `frontend/src/store/worldStore.ts` — 2 imports, 20 lines
