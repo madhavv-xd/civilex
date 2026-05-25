@@ -11,16 +11,18 @@ civilex/
 
 ---
 
-## Project Status
+## How It Works
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Backend scaffold + data models | ✅ Complete |
-| 2 | Hex grid world gen + civ configs + LLM client | ✅ Complete |
-| 3 | Agent system + world engine + prompts + end-to-end test | ✅ Complete |
-| 4 | Full simulation loop | ✅ Complete |
-| 5 | Live viewer | 🔧 Placeholder stub |
-| 6 | History viewer | 🔧 Placeholder stub |
+Each turn, the simulation runs a LangGraph state machine with 8 nodes:
+
+1. **🤖 Civ agents** — Each civilization's LLM decides its next move (war, trade, alliance, expand, build, or idle)
+2. **⚙️ World engine** — Deterministic referee resolves all decisions: battle math, tile captures, trade deals, resource yields, food consumption
+3. **🌪️ Event agent** — 20% chance of a random world event (drought, plague, gold discovery, rebellion, etc.)
+4. **📜 Narrator** — Generates 2-3 sentences of historical prose chronicling the turn
+5. **🧠 Memory refresh** — Every 5 turns, compresses each civ's event history into a memory summary
+6. **💾 Persist** — Saves turn snapshot, events, and civ states to MongoDB; emits SSE event
+7. **🏆 Judge** — Checks domination (60% tiles), elimination (one civ left), or stalemate (max turns)
+8. **🔁 Loop** — If no winner, advance turn and repeat
 
 ---
 
