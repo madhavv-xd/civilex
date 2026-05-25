@@ -17,6 +17,8 @@ node_modules/
 .next/
 out/
 
+.codectx-cache/
+
 # DB
 *.db
 
