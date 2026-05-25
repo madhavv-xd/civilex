@@ -1,35 +1,39 @@
-from fastapi import APIRouter, HTTPException
+"""
+FastAPI routes — all API endpoints.
+"""
+import asyncio
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+
 from db.client import ping_db
+from db.repositories import (
+    create_simulation, get_simulation, update_sim_status,
+    get_all_simulations, get_events_for_sim, get_all_turns,
+)
+from models.simulation import SimConfig, SimStatus
 from simulation.world_state import generate_world, world_snapshot_to_dict
+from simulation.loop import run_simulation_loop
+from api.sse import sse_manager, router as sse_router
 
 router = APIRouter()
+router.include_router(sse_router)
 
 
 @router.get("/health")
 async def health():
     db_ok = await ping_db()
-    return {
-        "status": "ok",
-        "db": "connected" if db_ok else "unreachable",
-    }
+    return {"status": "ok", "db": "connected" if db_ok else "unreachable"}
 
 
 @router.get("/world/preview")
 async def world_preview(grid_size: int = 15, seed: int | None = None):
-    """
-    Generate and return a fresh world without saving to DB.
-    Useful for verifying world generation before wiring up the frontend map.
-    """
     try:
         snapshot, civ_tiles = generate_world(grid_size=grid_size, seed=seed)
         world_dict = world_snapshot_to_dict(snapshot)
-
-        # Add civ tile positions for debugging
         civ_positions = {
             civ_id: [{"q": h.q, "r": h.r} for h in tiles]
             for civ_id, tiles in civ_tiles.items()
         }
-
         return {
             "grid_size": grid_size,
             "total_tiles": len(world_dict["tiles"]),
@@ -39,6 +43,119 @@ async def world_preview(grid_size: int = 15, seed: int | None = None):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class StartSimRequest(BaseModel):
+    grid_size: int = 15
+    max_turns: int = 50
+    civ_ids: list[str] = ["ironhold", "verdant", "merchants", "conclave"]
+
+
+@router.post("/sim/start")
+async def start_simulation(req: StartSimRequest, background_tasks: BackgroundTasks):
+    try:
+        config = SimConfig(
+            max_turns=req.max_turns,
+            grid_size=req.grid_size,
+            civ_ids=req.civ_ids,
+        )
+        sim = await create_simulation(civ_ids=req.civ_ids, config=config)
+        sim_id = str(sim.id)
+        sse_manager.create_channel(sim_id)
+        background_tasks.add_task(run_simulation_loop, sim_id)
+        return {
+            "sim_id": sim_id,
+            "status": "running",
+            "message": f"Simulation started. Connect to /api/sim/{sim_id}/stream to watch live.",
+            "stream": f"/api/sim/{sim_id}/stream",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sim/{sim_id}/stop")
+async def stop_simulation(sim_id: str):
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    if sim.status == SimStatus.completed:
+        raise HTTPException(status_code=400, detail="Simulation already completed")
+    await update_sim_status(sim_id, SimStatus.paused)
+    return {"sim_id": sim_id, "status": "paused"}
+
+
+@router.get("/sim/{sim_id}")
+async def get_sim(sim_id: str):
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    return {
+        "sim_id": str(sim.id),
+        "status": sim.status,
+        "turn": sim.turn,
+        "winner": sim.winner,
+        "winner_reason": sim.winner_reason,
+        "civ_ids": sim.civ_ids,
+        "config": sim.config.model_dump(),
+        "final_narrative": sim.final_narrative,
+        "created_at": sim.created_at.isoformat(),
+        "updated_at": sim.updated_at.isoformat(),
+        "completed_at": sim.completed_at.isoformat() if sim.completed_at else None,
+    }
+
+
+@router.get("/sim/{sim_id}/events")
+async def get_sim_events(sim_id: str, turn: int | None = None):
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    if turn is not None:
+        from db.repositories import get_events_for_turn
+        events = await get_events_for_turn(sim_id, turn)
+    else:
+        events = await get_events_for_sim(sim_id)
+    return {
+        "sim_id": sim_id,
+        "count": len(events),
+        "events": [
+            {"turn": e.turn, "type": e.type.value, "actor": e.actor,
+             "target": e.target, "narrative": e.narrative}
+            for e in events
+        ],
+    }
+
+
+@router.get("/sim/{sim_id}/turns")
+async def get_sim_turns(sim_id: str):
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    turns = await get_all_turns(sim_id)
+    return {
+        "sim_id": sim_id,
+        "total_turns": len(turns),
+        "turns": [{"turn": t.turn, "timestamp": t.timestamp.isoformat()} for t in turns],
+    }
+
+
+@router.get("/sims")
+async def list_simulations():
+    sims = await get_all_simulations(limit=20)
+    return {
+        "simulations": [
+            {
+                "sim_id": str(s.id),
+                "status": s.status,
+                "turn": s.turn,
+                "winner": s.winner,
+                "winner_reason": s.winner_reason,
+                "civ_ids": s.civ_ids,
+                "created_at": s.created_at.isoformat(),
+                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+            }
+            for s in sims
+        ]
+    }
 
 
 def _tile_distribution(tiles: list[dict]) -> dict[str, int]:
