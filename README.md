@@ -19,8 +19,8 @@ civilex/
 | 2 | Hex grid world gen + civ configs + LLM client | ✅ Complete |
 | 3 | Agent system + world engine + prompts + end-to-end test | ✅ Complete |
 | 4 | Full simulation loop | ✅ Complete |
-| 5 | Live viewer | ⏳ Pending |
-| 6 | History viewer | ⏳ Pending |
+| 5 | Live viewer | 🔧 Placeholder stub |
+| 6 | History viewer | 🔧 Placeholder stub |
 
 ---
 
@@ -164,6 +164,13 @@ Four `.txt` files in `backend/prompts/` define LLM agent behaviour:
 |--------|------|-------------|
 | `GET` | `/api/health` | Server + MongoDB connection status |
 | `GET` | `/api/world/preview?grid_size=15&seed=42` | Generate a fresh world (not saved). Returns tiles, civ positions, distribution |
+| `POST` | `/api/sim/start` | Start a new simulation (background task). Body: `{grid_size, max_turns, civ_ids}` |
+| `POST` | `/api/sim/{id}/stop` | Pause a running simulation |
+| `GET` | `/api/sim/{id}` | Get simulation status, turn, winner, config |
+| `GET` | `/api/sim/{id}/stream` | SSE stream — live `sim_start`, `turn_complete`, `sim_end` events |
+| `GET` | `/api/sim/{id}/events?turn=N` | Get all events (optionally filtered by turn) |
+| `GET` | `/api/sim/{id}/turns` | List all completed turns |
+| `GET` | `/api/sims` | List recent simulations (limit 20) |
 
 ---
 
@@ -253,6 +260,36 @@ Every 5 turns, compresses each civ's event history into a 3-sentence second-pers
 
 ---
 
+## Phase 4 — Full Simulation Loop
+
+The simulation loop uses **LangGraph** (`simulation/loop.py`) to orchestrate a state machine with these nodes executed sequentially each turn:
+
+1. **increment_turn** — advance turn counter, check pause status, update DB
+2. **run_civ_agents** — query all alive civs for decisions via OpenRouter (parallel)
+3. **run_world_engine** — resolve war/trade/alliance/capture/infrastructure + resource tick
+4. **run_event_agent** — 20% chance of random world event (drought, plague, gold, etc.)
+5. **run_narrator** — generate 2-3 sentences of historical lore
+6. **refresh_memory** — compress event log into memory summaries every 5 turns
+7. **persist_turn** — save turn snapshot, events, and updated civ states to MongoDB; emit SSE event
+8. **check_winner** — evaluate domination/elimination/stalemate conditions
+
+After `check_winner`, the graph either terminates (`END`) or loops back to `increment_turn`.
+
+**Judge** (`simulation/judge.py`) — Evaluates three win conditions each turn:
+- **Domination** — a civ controls ≥ 60% of all tiles
+- **Elimination** — only one civ remains alive
+- **Stalemate** — max turns reached; civ with most tiles wins
+
+**SSE Streaming** (`api/sse.py`) — In-memory pub/sub with per-simulation `asyncio.Queue`. Clients connect to `GET /api/sim/{id}/stream` and receive `sim_start`, `turn_complete`, `sim_end`, and `sim_error` events as JSON over Server-Sent Events.
+
+**Database persistence** (`db/repositories/`) — `sim_repo.py`, `event_repo.py`, `turn_repo.py` provide async CRUD for Simulation, Event, and Turn documents. `persist_turn` saves the turn snapshot, all events (with narrator entry), and updated `CivState` records.
+
+**API routes** (`api/routes.py`) — Full CRUD: `POST /api/sim/start` (background task via `BackgroundTasks`), `POST /api/sim/{id}/stop`, `GET /api/sim/{id}`, `GET /api/sim/{id}/events`, `GET /api/sim/{id}/turns`, `GET /api/sims`.
+
+**Simulation config** — `POST /api/sim/start` accepts `SimConfig` with `grid_size`, `max_turns`, and `civ_ids`. The simulation is created in MongoDB with status `pending`, then launched as a background task that generates the world, builds initial civ states, and runs the LangGraph loop.
+
+---
+
 ## File Reference
 
 | File | What It Does |
@@ -282,6 +319,10 @@ Every 5 turns, compresses each civ's event history into a 3-sentence second-pers
 | `prompts/narrator_system.txt` | Narration style guide (41 lines) |
 | `prompts/memory_system.txt` | Memory compression instructions (26 lines) |
 | `scripts/test_single_turn.py` | Full single-turn end-to-end test |
+| `simulation/loop.py` | LangGraph simulation state machine (8 nodes, conditional loop) |
+| `simulation/judge.py` | Win condition evaluator (domination/elimination/stalemate) |
+| `api/sse.py` | SSE pub/sub manager + streaming endpoint |
+| `db/repositories/` | Async CRUD for Simulation, Event, and Turn documents |
 | `frontend/src/app/page.tsx` | Dashboard with civ cards + DB status |
 | `frontend/src/lib/apiClient.ts` | Typed `apiFetch<T>` helper |
 | `frontend/src/store/*.ts` | Zustand stores (sim, event, world) |
