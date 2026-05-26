@@ -1,19 +1,24 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { api } from "@/lib/apiClient"
 import { useSimulation } from "@/hooks/useSimulation"
-import { CIV_COLORS, CIV_ICONS } from "@/lib/civColors"
+import { CIV_COLORS, CIV_NAMES, CIV_ICON_COMPONENTS } from "@/lib/civColors"
+import {
+  Globe, Play, Scroll, Database, AlertTriangle,
+  Clock, Trophy, Sword2, Leaf, Coins, Eye, ArrowRight,
+} from "@/components/Icons"
 
 const CIVS = [
-  { id: "ironhold",  name: "The Ironhold Confederacy", trait: "Militaristic",  color: "#C0392B", icon: "⚔️" },
-  { id: "verdant",   name: "The Verdant Pact",          trait: "Diplomatic",    color: "#27AE60", icon: "🌿" },
-  { id: "merchants", name: "The Ashborne Merchant Guild",trait: "Transactional", color: "#F39C12", icon: "💰" },
-  { id: "conclave",  name: "The Silent Conclave",        trait: "Isolationist",  color: "#8E44AD", icon: "🔮" },
+  { id: "ironhold",  name: "The Ironhold Confederacy",    trait: "Militaristic",  color: "#C0392B", Icon: Sword2, desc: "Masters of war and iron discipline" },
+  { id: "verdant",   name: "The Verdant Pact",            trait: "Diplomatic",    color: "#27AE60", Icon: Leaf,   desc: "Builders of alliances and green lands" },
+  { id: "merchants", name: "The Ashborne Merchant Guild", trait: "Transactional", color: "#F39C12", Icon: Coins,  desc: "Wealth is the only true power" },
+  { id: "conclave",  name: "The Silent Conclave",         trait: "Isolationist",  color: "#8E44AD", Icon: Eye,    desc: "Hidden knowledge, hidden strength" },
 ]
 
 export default function HomePage() {
-  const [dbStatus, setDbStatus] = useState<"checking"|"connected"|"unreachable">("checking")
+  const [dbStatus, setDbStatus] = useState<"checking" | "connected" | "unreachable">("checking")
   const [recentSims, setRecentSims] = useState<any[]>([])
   const { startSim, isStarting, startError } = useSimulation()
 
@@ -21,113 +26,222 @@ export default function HomePage() {
     api.health()
       .then((r) => setDbStatus(r.db === "connected" ? "connected" : "unreachable"))
       .catch(() => setDbStatus("unreachable"))
-
     api.listSims()
       .then((r) => setRecentSims(r.simulations.slice(0, 4)))
       .catch(() => {})
   }, [])
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16 bg-zinc-950">
+    <main className="min-h-screen bg-zinc-950 flex flex-col">
 
-      {/* Hero */}
-      <div className="text-center mb-10">
-        <div className="text-6xl mb-4">🌍</div>
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-100 mb-2">
-          AI Civilization Simulator
-        </h1>
-        <p className="text-zinc-400 text-lg max-w-md mx-auto">
-          Spawn civilizations. Watch them think. Let history write itself.
-        </p>
-      </div>
+      {/* ── Top bar ─────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-900">
+        <div className="flex items-center gap-2 text-zinc-300">
+          <Globe size={16} className="text-indigo-400" />
+          <span className="text-sm font-semibold tracking-tight">CivilEx</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* DB pill */}
+          {dbStatus === "checking" && (
+            <span className="text-[11px] px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-500">
+              Connecting…
+            </span>
+          )}
+          {dbStatus === "connected" && (
+            <span className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full
+                             bg-emerald-950 text-emerald-400 border border-emerald-900">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Live
+            </span>
+          )}
+          {dbStatus === "unreachable" && (
+            <span className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full
+                             bg-red-950 text-red-400 border border-red-900">
+              <AlertTriangle size={11} />
+              Offline
+            </span>
+          )}
+          <Link href="/history"
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300
+                       transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-800/60">
+            <Scroll size={12} />
+            History
+          </Link>
+        </div>
+      </header>
 
-      {/* DB status */}
-      <div className="mb-8">
-        {dbStatus === "checking" && (
-          <span className="text-xs px-3 py-1 rounded-full bg-zinc-800 text-zinc-400">Checking connection…</span>
-        )}
-        {dbStatus === "connected" && (
-          <span className="text-xs px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">● MongoDB connected</span>
-        )}
-        {dbStatus === "unreachable" && (
-          <span className="text-xs px-3 py-1 rounded-full bg-red-950 text-red-400 border border-red-800">● DB unreachable — is the backend running?</span>
-        )}
-      </div>
+      {/* ── Main content ────────────────────────────────────────── */}
+      <div className="flex-1 grid lg:grid-cols-[1fr_380px] gap-0">
 
-      {/* Civ cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 w-full max-w-3xl">
-        {CIVS.map((civ) => (
-          <div key={civ.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 flex flex-col gap-2">
-            <div className="text-2xl">{civ.icon}</div>
-            <div className="text-sm font-semibold text-zinc-100 leading-tight">{civ.name}</div>
-            <div className="text-xs font-medium px-2 py-0.5 rounded-full w-fit"
-                 style={{ background: civ.color + "22", color: civ.color }}>
-              {civ.trait}
+        {/* Left — Hero + CTA */}
+        <div className="flex flex-col items-start justify-center px-10 py-16 relative">
+          {/* Subtle background glow */}
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-transparent pointer-events-none" />
+
+          {/* Icon mark */}
+          <div className="relative mb-8 w-14 h-14 rounded-2xl bg-indigo-600/15 border border-indigo-500/20
+                          flex items-center justify-center text-indigo-400">
+            <Globe size={26} />
+            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-indigo-500
+                             border-2 border-zinc-950" />
+          </div>
+
+          <h1 className="text-5xl font-bold tracking-tight text-zinc-50 mb-4 leading-tight">
+            AI Civilization<br />Simulator
+          </h1>
+          <p className="text-zinc-400 text-lg max-w-sm mb-10 leading-relaxed">
+            Four factions. Fifty turns. One history.
+            Watch AI civilizations forge alliances, declare war, and shape the world.
+          </p>
+
+          {/* CTA */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={startSim}
+              disabled={isStarting || dbStatus !== "connected"}
+              className="flex items-center gap-2.5 px-7 py-3.5 rounded-xl bg-indigo-600
+                         hover:bg-indigo-500 active:bg-indigo-700
+                         disabled:opacity-40 disabled:cursor-not-allowed
+                         text-white font-semibold text-sm transition-all
+                         shadow-lg shadow-indigo-900/40"
+            >
+              <Play size={13} />
+              {isStarting ? "Starting…" : "Start Simulation"}
+            </button>
+            <Link href="/history"
+              className="flex items-center gap-2 px-5 py-3.5 rounded-xl border border-zinc-700
+                         hover:border-zinc-500 text-zinc-400 hover:text-zinc-200
+                         text-sm font-medium transition-all">
+              <Scroll size={13} />
+              View History
+            </Link>
+          </div>
+
+          {startError && (
+            <p className="text-sm text-red-400 flex items-center gap-2 mt-1">
+              <AlertTriangle size={13} /> {startError}
+            </p>
+          )}
+
+          {/* Stats row */}
+          <div className="flex items-center gap-6 mt-10 pt-8 border-t border-zinc-900 w-full max-w-sm">
+            <div>
+              <div className="text-2xl font-bold text-zinc-100">4</div>
+              <div className="text-xs text-zinc-600 mt-0.5">Civilizations</div>
+            </div>
+            <div className="w-px h-8 bg-zinc-800" />
+            <div>
+              <div className="text-2xl font-bold text-zinc-100">50</div>
+              <div className="text-xs text-zinc-600 mt-0.5">Turns per age</div>
+            </div>
+            <div className="w-px h-8 bg-zinc-800" />
+            <div>
+              <div className="text-2xl font-bold text-zinc-100">∞</div>
+              <div className="text-xs text-zinc-600 mt-0.5">Outcomes</div>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* Actions */}
-      <div className="flex gap-4 mb-4">
-        <button
-          onClick={startSim}
-          disabled={isStarting || dbStatus !== "connected"}
-          className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40
-                     disabled:cursor-not-allowed text-white font-semibold transition-colors"
-        >
-          {isStarting ? "Starting…" : "▶ Start Simulation"}
-        </button>
-        <a href="/history"
-           className="px-6 py-3 rounded-xl border border-zinc-700 hover:border-zinc-500
-                      text-zinc-300 hover:text-zinc-100 font-semibold transition-colors">
-          View History
-        </a>
-      </div>
+        {/* Right — Civilization roster + recent sims */}
+        <div className="border-l border-zinc-900 flex flex-col bg-zinc-950">
 
-      {startError && (
-        <p className="text-sm text-red-400 mb-4">{startError}</p>
-      )}
-
-      {/* Recent sims */}
-      {recentSims.length > 0 && (
-        <div className="w-full max-w-3xl mt-8">
-          <div className="text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-3">
-            Recent Simulations
+          {/* Section label */}
+          <div className="px-5 pt-8 pb-3">
+            <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+              Civilizations
+            </span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {recentSims.map((sim) => (
-              <a key={sim.sim_id} href={`/simulation/${sim.sim_id}`}
-                 className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 hover:border-zinc-600 transition-colors">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  {sim.winner && (
-                    <span className="text-sm">{CIV_ICONS[sim.winner] ?? "🏆"}</span>
-                  )}
-                  <span className="text-xs text-zinc-400 font-medium truncate">
-                    {sim.winner ? (CIV_COLORS[sim.winner] ? sim.winner : "Unknown") : sim.status}
-                  </span>
+
+          {/* Civ list */}
+          <div className="px-4 flex flex-col gap-2">
+            {CIVS.map((civ) => (
+              <div
+                key={civ.id}
+                className="flex items-center gap-3 px-3 py-3 rounded-xl border border-zinc-800/70
+                           bg-zinc-900/40 hover:border-zinc-700 transition-colors group"
+              >
+                {/* Icon */}
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: civ.color + "18", border: `1px solid ${civ.color}30`, color: civ.color }}
+                >
+                  <civ.Icon size={16} />
                 </div>
-                <div className="text-[10px] text-zinc-600">
-                  {sim.turn} turns · {sim.winner_reason ?? sim.status}
+                {/* Text */}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-zinc-100 truncate leading-tight">
+                    {civ.name}
+                  </div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">{civ.desc}</div>
                 </div>
-              </a>
+                {/* Trait badge */}
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                  style={{ background: civ.color + "18", color: civ.color }}
+                >
+                  {civ.trait}
+                </span>
+              </div>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Phase indicator */}
-      <div className="mt-12 flex gap-2 items-center">
-        {[1,2,3,4,5,6].map((p) => (
-          <div key={p}
-               className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold
-                 ${p <= 5 ? "bg-indigo-600 text-white" : "bg-zinc-800 text-zinc-500"}`}>
-            {p}
+          {/* Recent simulations */}
+          {recentSims.length > 0 && (
+            <>
+              <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+                  Recent
+                </span>
+                <Link href="/history" className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors
+                                                  flex items-center gap-1">
+                  All <ArrowRight size={10} />
+                </Link>
+              </div>
+              <div className="px-4 flex flex-col gap-1.5 pb-6">
+                {recentSims.map((sim) => {
+                  const WinIcon = sim.winner ? CIV_ICON_COMPONENTS[sim.winner] : null
+                  const color = sim.winner ? CIV_COLORS[sim.winner] : "#6b7280"
+                  const name = sim.winner ? CIV_NAMES[sim.winner] ?? sim.winner : "No winner"
+                  return (
+                    <Link
+                      key={sim.sim_id}
+                      href={`/simulation/${sim.sim_id}`}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-zinc-800/60
+                                 bg-zinc-900/30 hover:border-zinc-700 transition-colors group"
+                    >
+                      <div
+                        className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+                        style={{ background: `${color}18`, color }}
+                      >
+                        {WinIcon ? <WinIcon size={13} /> : <Trophy size={13} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-zinc-300 truncate">{name}</div>
+                        <div className="text-[10px] text-zinc-600">
+                          {sim.turn} turns · {sim.winner_reason ?? sim.status}
+                        </div>
+                      </div>
+                      <ArrowRight size={12} className="text-zinc-700 group-hover:text-zinc-500 transition-colors flex-shrink-0" />
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Bottom status bar */}
+          <div className="mt-auto border-t border-zinc-900 px-5 py-3 flex items-center gap-2">
+            <Database size={12} className="text-zinc-600" />
+            <span className="text-[11px] text-zinc-600">
+              {dbStatus === "connected"
+                ? "Backend connected"
+                : dbStatus === "unreachable"
+                ? "Backend unreachable"
+                : "Checking…"}
+            </span>
           </div>
-        ))}
-        <span className="ml-2 text-xs text-zinc-500">Phase 5 — Frontend live</span>
+        </div>
       </div>
-
     </main>
   )
 }

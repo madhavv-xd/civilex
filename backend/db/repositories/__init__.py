@@ -6,6 +6,7 @@ from db.repositories.sim_repo import (
     set_sim_winner,
     get_all_simulations,
     is_sim_paused,
+    delete_simulation,
 )
 from db.repositories.turn_repo import (
     save_turn,
@@ -34,4 +35,5 @@ __all__ = [
     "get_events_for_turn",
     "get_events_for_sim",
     "get_events_as_dicts",
+    "delete_simulation",
 ]

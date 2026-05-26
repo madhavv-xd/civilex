@@ -1,8 +1,18 @@
+import type { ComponentType } from "react"
+import { Sword2, Leaf, Coins, Eye } from "@/components/Icons"
+
 export const CIV_COLORS: Record<string, string> = {
   ironhold:  "#C0392B",
   verdant:   "#27AE60",
   merchants: "#F39C12",
   conclave:  "#8E44AD",
+}
+
+export const CIV_ICON_COMPONENTS: Record<string, ComponentType<{ size?: number; className?: string }>> = {
+  ironhold:  Sword2,
+  verdant:   Leaf,
+  merchants: Coins,
+  conclave:  Eye,
 }
 
 export const CIV_NAMES: Record<string, string> = {

@@ -9,6 +9,7 @@ from db.client import ping_db
 from db.repositories import (
     create_simulation, get_simulation, update_sim_status,
     get_all_simulations, get_events_for_sim, get_all_turns,
+    delete_simulation,
 )
 from models.simulation import SimConfig, SimStatus
 from simulation.world_state import generate_world, world_snapshot_to_dict
@@ -82,6 +83,20 @@ async def stop_simulation(sim_id: str):
         raise HTTPException(status_code=400, detail="Simulation already completed")
     await update_sim_status(sim_id, SimStatus.paused)
     return {"sim_id": sim_id, "status": "paused"}
+
+
+@router.delete("/sim/{sim_id}")
+async def delete_sim(sim_id: str):
+    """Permanently delete a simulation and all its turns/events."""
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    if sim.status == SimStatus.running:
+        raise HTTPException(status_code=409, detail="Cannot delete a running simulation — stop it first")
+    deleted = await delete_simulation(sim_id)
+    if not deleted:
+        raise HTTPException(status_code=500, detail="Delete failed")
+    return {"sim_id": sim_id, "deleted": True}
 
 
 @router.get("/sim/{sim_id}")
@@ -164,3 +179,107 @@ def _tile_distribution(tiles: list[dict]) -> dict[str, int]:
         t = tile["tile_type"]
         dist[t] = dist.get(t, 0) + 1
     return dict(sorted(dist.items()))
+
+
+# ── Phase 6 endpoints ─────────────────────────────────────────────────────────
+
+@router.get("/sim/{sim_id}/summary")
+async def get_sim_summary(sim_id: str):
+    """Get aggregated simulation stats."""
+    from db.repositories.summary_repo import get_simulation_summary
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    summary = await get_simulation_summary(sim_id)
+    return {
+        "sim_id":  sim_id,
+        "winner":  sim.winner,
+        "turn":    sim.turn,
+        "status":  sim.status,
+        **summary,
+    }
+
+
+@router.get("/sim/{sim_id}/export")
+async def export_simulation(sim_id: str):
+    """Export full simulation as JSON — all turns, events, civ states."""
+    from fastapi.responses import JSONResponse
+    from db.repositories.turn_repo import get_all_turns
+    from db.repositories.event_repo import get_events_as_dicts
+
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    turns  = await get_all_turns(sim_id)
+    events = await get_events_as_dicts(sim_id)
+
+    export_data = {
+        "sim_id":           sim_id,
+        "winner":           sim.winner,
+        "winner_reason":    sim.winner_reason,
+        "final_narrative":  sim.final_narrative,
+        "total_turns":      sim.turn,
+        "civ_ids":          sim.civ_ids,
+        "created_at":       sim.created_at.isoformat(),
+        "completed_at":     sim.completed_at.isoformat() if sim.completed_at else None,
+        "turns": [
+            {
+                "turn":       t.turn,
+                "timestamp":  t.timestamp.isoformat(),
+                "tiles":      [tile.model_dump() for tile in t.world_snapshot.tiles],
+                "civ_resources": {
+                    k: v.model_dump()
+                    for k, v in t.world_snapshot.civ_resources.items()
+                },
+            }
+            for t in turns
+        ],
+        "events": events,
+    }
+
+    filename = f"civ-sim-{sim_id[:8]}-{sim.winner or 'draw'}.json"
+    return JSONResponse(
+        content=export_data,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/sim/{sim_id}/turn/{turn_num}")
+async def get_sim_turn(sim_id: str, turn_num: int):
+    """Get a specific turn's world snapshot — used by the replay scrubber."""
+    from db.repositories.turn_repo import get_turn
+    from db.repositories.event_repo import get_events_for_turn
+
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    turn_doc = await get_turn(sim_id, turn_num)
+    if not turn_doc:
+        raise HTTPException(status_code=404, detail=f"Turn {turn_num} not found")
+
+    events = await get_events_for_turn(sim_id, turn_num)
+
+    return {
+        "sim_id":  sim_id,
+        "turn":    turn_num,
+        "world_snapshot": {
+            "tiles": [t.model_dump() for t in turn_doc.world_snapshot.tiles],
+            "civ_resources": {
+                k: v.model_dump()
+                for k, v in turn_doc.world_snapshot.civ_resources.items()
+            },
+        },
+        "events": [
+            {
+                "turn":      e.turn,
+                "type":      e.type.value,
+                "actor":     e.actor,
+                "target":    e.target,
+                "narrative": e.narrative,
+                "data":      e.data,
+            }
+            for e in events
+        ],
+    }

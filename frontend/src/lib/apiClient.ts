@@ -42,5 +42,10 @@ export const api = {
       civ_ids: string[]; created_at: string; completed_at: string | null
     }> }>("/sims"),
 
+  deleteSim: (simId: string) =>
+    apiFetch<{ sim_id: string; deleted: boolean }>(`/sim/${simId}`, {
+      method: "DELETE",
+    }),
+
   streamUrl: (simId: string) => `${API_BASE}/sim/${simId}/stream`,
 }

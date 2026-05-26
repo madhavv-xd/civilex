@@ -1,28 +1,33 @@
 "use client"
 
+import Link from "next/link"
 import { useEventStore } from "@/store/eventStore"
 import { useSimStore } from "@/store/simStore"
-import { CIV_COLORS, CIV_ICONS, CIV_NAMES } from "@/lib/civColors"
+import { CIV_COLORS, CIV_NAMES, CIV_ICON_COMPONENTS } from "@/lib/civColors"
+import { Trophy, ArrowLeft, BarChart, Scroll } from "@/components/Icons"
 
-export default function WinScreen() {
+interface WinScreenProps {
+  onViewSummary?: () => void
+}
+
+export default function WinScreen({ onViewSummary }: WinScreenProps) {
   const { current } = useSimStore()
   const { narratorLog } = useEventStore()
 
   if (!current || current.status !== "completed" || !current.winner) return null
 
-  const winner = current.winner
+  const winner   = current.winner
   const winReason = current.winner_reason
-  const color = CIV_COLORS[winner] ?? "#eab308"
-  const icon = CIV_ICONS[winner] ?? "🏆"
-  const name = CIV_NAMES[winner] ?? winner
-
+  const color    = CIV_COLORS[winner] ?? "#eab308"
+  const name     = CIV_NAMES[winner]  ?? winner
+  const WinIcon  = CIV_ICON_COMPONENTS[winner] ?? null
   const finalNarrative = narratorLog[narratorLog.length - 1]?.text ?? ""
 
   const winLabel: Record<string, string> = {
-    domination: "Domination Victory",
-    elimination: "Elimination Victory",
-    stalemate: "Stalemate — Most Tiles",
-    draw: "The age ended in a draw",
+    domination:         "Domination Victory",
+    elimination:        "Elimination Victory",
+    stalemate:          "Stalemate — Most Tiles",
+    draw:               "The age ended in a draw",
     mutual_destruction: "Mutual Destruction",
   }
 
@@ -32,55 +37,55 @@ export default function WinScreen() {
       <div
         className="max-w-md w-full mx-4 rounded-2xl border p-8 text-center shadow-2xl"
         style={{
-          background: `linear-gradient(135deg, #09090b 60%, ${color}15)`,
+          background:  `linear-gradient(135deg, #09090b 60%, ${color}15)`,
           borderColor: `${color}44`,
-          boxShadow: `0 0 60px ${color}22`,
+          boxShadow:   `0 0 60px ${color}22`,
         }}
       >
-        {/* Trophy */}
-        <div className="text-6xl mb-4">🏆</div>
+        {/* Winner icon */}
+        <div className="flex items-center justify-center mb-4">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: `${color}20`, border: `1px solid ${color}44`, color }}
+          >
+            {WinIcon ? <WinIcon size={32} /> : <Trophy size={32} />}
+          </div>
+        </div>
 
-        {/* Winner */}
-        <div
-          className="text-xs font-semibold uppercase tracking-widest mb-2"
-          style={{ color }}
-        >
+        <div className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color }}>
           {winLabel[winReason ?? ""] ?? winReason}
         </div>
-        <div className="text-3xl font-bold text-zinc-100 mb-1 flex items-center justify-center gap-2">
-          <span>{icon}</span>
-          <span>{name}</span>
-        </div>
-        <div className="text-zinc-500 text-sm mb-6">
-          Turn {current.turn}
-        </div>
+        <div className="text-3xl font-bold text-zinc-100 mb-1">{name}</div>
+        <div className="text-zinc-500 text-sm mb-6">Turn {current.turn}</div>
 
-        {/* Final narrative */}
         {finalNarrative && (
-          <div className="border-l-2 pl-4 text-left mb-6"
-               style={{ borderColor: `${color}66` }}>
+          <div className="border-l-2 pl-4 text-left mb-6" style={{ borderColor: `${color}66` }}>
             <p className="text-sm text-zinc-400 italic leading-relaxed">
               &ldquo;{finalNarrative}&rdquo;
             </p>
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex gap-3 justify-center">
-          <a
-            href="/"
-            className="px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700
-                       text-zinc-300 text-sm font-medium transition-colors"
-          >
-            ← Dashboard
-          </a>
-          <a
-            href="/history"
-            className="px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
-            style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}
-          >
-            View History
-          </a>
+          <Link href="/"
+             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700
+                        text-zinc-300 text-sm font-medium transition-colors">
+            <ArrowLeft size={13} /> Dashboard
+          </Link>
+          {onViewSummary && (
+            <button
+              onClick={onViewSummary}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
+              style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}
+            >
+              <BarChart size={13} /> View Stats
+            </button>
+          )}
+          <Link href="/history"
+             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-colors
+                        border border-zinc-700 text-zinc-400 hover:text-zinc-200">
+            <Scroll size={13} /> History
+          </Link>
         </div>
       </div>
     </div>

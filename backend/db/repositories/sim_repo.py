@@ -76,3 +76,20 @@ async def is_sim_paused(sim_id: str) -> bool:
     if not sim:
         return True
     return sim.status in (SimStatus.paused, SimStatus.completed, SimStatus.failed)
+
+
+async def delete_simulation(sim_id: str) -> bool:
+    """Delete a simulation and all its associated data. Returns True if deleted."""
+    sim = await get_simulation(sim_id)
+    if not sim:
+        return False
+
+    # Access the underlying motor database via Beanie's collection
+    db = Simulation.get_pymongo_collection().database
+    await db["turns"].delete_many({"sim_id": sim_id})
+    await db["events"].delete_many({"sim_id": sim_id})
+    await db["civ_states"].delete_many({"sim_id": sim_id})
+
+    # Delete the simulation document itself via Beanie
+    await sim.delete()
+    return True
