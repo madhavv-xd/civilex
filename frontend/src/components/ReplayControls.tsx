@@ -1,16 +1,20 @@
 "use client"
 
-import { useReplay } from "@/hooks/useReplay"
+import TurnTimeline from "@/components/TurnTimeline"
 import { ChevronLeft, ChevronRight, ArrowRight } from "@/components/Icons"
 
 interface ReplayControlsProps {
-  simId: string
   totalTurns: number
+  replayTurn: number
+  isLoading: boolean
+  isReplayMode: boolean
+  goToTurn: (turn: number) => void
+  exitReplay: () => void
 }
 
-export default function ReplayControls({ simId, totalTurns }: ReplayControlsProps) {
-  const { replayTurn, isLoading, isReplayMode, goToTurn, exitReplay } = useReplay(simId, totalTurns)
-
+export default function ReplayControls({
+  totalTurns, replayTurn, isLoading, isReplayMode, goToTurn, exitReplay,
+}: ReplayControlsProps) {
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-zinc-950 border-t border-zinc-800">
 
@@ -33,14 +37,12 @@ export default function ReplayControls({ simId, totalTurns }: ReplayControlsProp
         <span className="text-xs text-zinc-600">/ {totalTurns}</span>
       </div>
 
-      {/* Scrubber */}
-      <input
-        type="range"
-        min={0}
-        max={totalTurns}
-        value={replayTurn}
-        onChange={(e) => goToTurn(Number(e.target.value))}
-        className="flex-1 h-1.5 accent-amber-500 cursor-pointer"
+      {/* Turn timeline scrubber */}
+      <TurnTimeline
+        totalTurns={totalTurns}
+        currentTurn={replayTurn}
+        onSelect={goToTurn}
+        disabled={isLoading}
       />
 
       {/* Step buttons */}
@@ -48,6 +50,7 @@ export default function ReplayControls({ simId, totalTurns }: ReplayControlsProp
         <button
           onClick={() => goToTurn(Math.max(0, replayTurn - 1))}
           disabled={replayTurn <= 0 || isLoading}
+          aria-label="Previous turn"
           className="w-7 h-7 rounded-lg border border-zinc-700 text-zinc-400
                      hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-30
                      transition-colors flex items-center justify-center"
@@ -57,6 +60,7 @@ export default function ReplayControls({ simId, totalTurns }: ReplayControlsProp
         <button
           onClick={() => goToTurn(Math.min(totalTurns, replayTurn + 1))}
           disabled={replayTurn >= totalTurns || isLoading}
+          aria-label="Next turn"
           className="w-7 h-7 rounded-lg border border-zinc-700 text-zinc-400
                      hover:border-zinc-500 hover:text-zinc-200 disabled:opacity-30
                      transition-colors flex items-center justify-center"

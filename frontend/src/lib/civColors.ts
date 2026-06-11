@@ -54,6 +54,7 @@ export const EVENT_META: Record<string, { icon: string; color: string; label: st
   natural_disaster:     { icon: "🌊",  color: "#3b82f6", label: "Disaster"         },
   ancient_ruins_found:  { icon: "🏛️",  color: "#a855f7", label: "Ruins found"      },
   rebellion:            { icon: "🔥",  color: "#ef4444", label: "Rebellion"        },
+  relationship_shift:   { icon: "↕️",  color: "#38bdf8", label: "Relations shift"  },
   narrator:             { icon: "📜",  color: "#d4a847", label: "Chronicle"        },
   civ_eliminated:       { icon: "💀",  color: "#6b7280", label: "Eliminated"       },
   sim_start:            { icon: "🌍",  color: "#22c55e", label: "Age begins"       },

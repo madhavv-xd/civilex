@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useFocusTrap } from "@/hooks/useFocusTrap"
 import { CIV_COLORS, CIV_NAMES, CIV_ICON_COMPONENTS } from "@/lib/civColors"
 import { Trophy, X, Download, Clock, BarChart, Sword2, Link2, Flag, Handshake, Building, Skull, Globe } from "@/components/Icons"
 
@@ -28,18 +29,19 @@ interface SimSummaryProps {
 }
 
 export default function SimSummary({ simId, isVisible, onClose }: SimSummaryProps) {
-  const [summary, setSummary] = useState<SummaryData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState<{ simId: string; summary: SummaryData } | null>(null)
+  const trapRef = useFocusTrap<HTMLDivElement>(isVisible)
 
   useEffect(() => {
     if (!isVisible || !simId) return
-    setLoading(true)
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/sim/${simId}/summary`)
       .then((r) => r.json())
-      .then(setSummary)
+      .then((summary: SummaryData) => setLoaded({ simId, summary }))
       .catch(console.error)
-      .finally(() => setLoading(false))
   }, [isVisible, simId])
+
+  const summary = loaded?.simId === simId ? loaded.summary : null
+  const loading = summary === null
 
   if (!isVisible) return null
 
@@ -65,6 +67,10 @@ export default function SimSummary({ simId, isVisible, onClose }: SimSummaryProp
                     bg-zinc-950/80 backdrop-blur-sm"
          onClick={onClose}>
       <div
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Simulation summary"
         className="max-w-sm w-full mx-4 rounded-2xl border p-6 shadow-2xl"
         style={{
           background: "#0d0d0f",
@@ -89,6 +95,7 @@ export default function SimSummary({ simId, isVisible, onClose }: SimSummaryProp
           </div>
           <button
             onClick={onClose}
+            aria-label="Close summary"
             className="text-zinc-600 hover:text-zinc-400 transition-colors"
           >
             <X size={16} />

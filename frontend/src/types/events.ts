@@ -15,6 +15,7 @@ export type EventType =
   | "natural_disaster"
   | "ancient_ruins_found"
   | "rebellion"
+  | "relationship_shift"
   | "narrator"
   | "turn_start"
   | "sim_start"

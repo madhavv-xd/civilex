@@ -3,7 +3,6 @@
 import { useState, useCallback } from "react"
 import { useWorldStore } from "@/store/worldStore"
 import { useEventStore } from "@/store/eventStore"
-import { api } from "@/lib/apiClient"
 
 export function useReplay(simId: string, totalTurns: number) {
   const [replayTurn, setReplayTurn] = useState<number>(totalTurns)
@@ -11,7 +10,7 @@ export function useReplay(simId: string, totalTurns: number) {
   const [isReplayMode, setIsReplayMode] = useState(false)
 
   const { setWorldState } = useWorldStore()
-  const { addEvents, addNarration } = useEventStore()
+  const { addNarration } = useEventStore()
 
   const goToTurn = useCallback(async (turn: number) => {
     if (!simId || turn < 0) return
@@ -44,10 +43,11 @@ export function useReplay(simId: string, totalTurns: number) {
     }
   }, [simId, setWorldState, addNarration])
 
-  const exitReplay = useCallback(() => {
+  const exitReplay = useCallback(async () => {
+    await goToTurn(totalTurns)
     setIsReplayMode(false)
     setReplayTurn(totalTurns)
-  }, [totalTurns])
+  }, [totalTurns, goToTurn])
 
   return {
     replayTurn,

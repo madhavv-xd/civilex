@@ -23,3 +23,93 @@ html, body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Feed entries slide in from the right ─────────────────────── */
+@keyframes feed-enter {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.feed-enter {
+  animation: feed-enter 300ms ease-out;
+}
+
+/* ── Latest narrator block pulses softly ──────────────────────── */
+@keyframes narrator-pulse {
+  0%, 100% { background: rgba(245, 158, 11, 0.04); }
+  50%      { background: rgba(245, 158, 11, 0.12); }
+}
+.narrator-latest {
+  animation: narrator-pulse 2.4s ease-in-out infinite;
+}
+
+/* ── Civ elimination: red flash, then fade to greyscale ───────── */
+@keyframes civ-eliminate {
+  0%   { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9); filter: grayscale(0); opacity: 1; }
+  20%  { box-shadow: 0 0 24px 4px rgba(239, 68, 68, 0.6); }
+  100% { box-shadow: none; filter: grayscale(1); opacity: 0.4; }
+}
+.civ-eliminate {
+  animation: civ-eliminate 1.5s ease-out forwards;
+}
+
+/* ── Toast slide-in ───────────────────────────────────────────── */
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.toast-enter {
+  animation: toast-enter 250ms ease-out;
+}
+
+/* ── Win screen staggered entrance ────────────────────────────── */
+@keyframes win-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes win-drop {
+  from { opacity: 0; transform: translateY(-24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.win-backdrop  { animation: win-fade 300ms ease-out; }
+.win-trophy    { animation: win-drop 400ms ease-out 250ms backwards; }
+.win-narrative { animation: win-fade 800ms ease-out 1100ms backwards; }
+
+/* ── Empty-state hexagon pulse ────────────────────────────────── */
+.hex-pulse-grid {
+  display: flex;
+  gap: 6px;
+}
+.hex-pulse {
+  width: 14px;
+  height: 16px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: #4f46e5;
+  animation: hex-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hex-pulse {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 1; }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .feed-enter,
+  .narrator-latest,
+  .civ-eliminate,
+  .toast-enter,
+  .win-backdrop,
+  .win-trophy,
+  .win-narrative,
+  .hex-pulse,
+  .animate-pulse,
+  .animate-spin {
+    animation: none !important;
+  }
+  .civ-eliminate {
+    filter: grayscale(1);
+    opacity: 0.4;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}

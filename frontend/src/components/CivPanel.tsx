@@ -1,13 +1,27 @@
 "use client"
 
+import { useState } from "react"
 import { useWorldStore } from "@/store/worldStore"
+import { useUiStore } from "@/store/uiStore"
 import { CIV_COLORS, CIV_ICONS, CIV_NAMES } from "@/lib/civColors"
 import type { CivState } from "@/types"
 
 const CIV_ORDER = ["ironhold", "verdant", "merchants", "conclave"]
 
+function moodLabel(score: number): string {
+  if (score >= 60) return "ALLIED"
+  if (score >= 20) return "FRIENDLY"
+  if (score >= -20) return "NEUTRAL"
+  if (score >= -60) return "HOSTILE"
+  return "AT WAR"
+}
+
 export default function CivPanel() {
-  const { civStates } = useWorldStore()
+  const civStates = useWorldStore((s) => s.civStates)
+  const prevCivStates = useWorldStore((s) => s.prevCivStates)
+  const tileHistory = useWorldStore((s) => s.tileHistory)
+  const focusedCiv = useUiStore((s) => s.focusedCiv)
+  const toggleFocusedCiv = useUiStore((s) => s.toggleFocusedCiv)
 
   if (!civStates || Object.keys(civStates).length === 0) {
     return (
@@ -24,7 +38,6 @@ export default function CivPanel() {
   const maxGold = Math.max(...allStates.map((s) => s.resources.gold), 1)
   const maxFood = Math.max(...allStates.map((s) => s.resources.food), 1)
   const maxMilitary = Math.max(...allStates.map((s) => s.resources.military), 1)
-  const maxTiles = Math.max(...allStates.map((s) => s.tile_count), 1)
 
   return (
     <div className="flex gap-3 h-full">
@@ -36,10 +49,14 @@ export default function CivPanel() {
             key={civId}
             civId={civId}
             state={state}
+            prev={prevCivStates[civId]}
+            history={tileHistory[civId] ?? []}
             maxGold={maxGold}
             maxFood={maxFood}
             maxMilitary={maxMilitary}
-            maxTiles={maxTiles}
+            isFocused={focusedCiv === civId}
+            anyFocused={focusedCiv !== null}
+            onFocus={() => toggleFocusedCiv(civId)}
           />
         )
       })}
@@ -48,28 +65,43 @@ export default function CivPanel() {
 }
 
 function CivCard({
-  civId, state, maxGold, maxFood, maxMilitary, maxTiles,
+  civId, state, prev, history, maxGold, maxFood, maxMilitary, isFocused, anyFocused, onFocus,
 }: {
   civId: string
   state: CivState
+  prev: CivState | undefined
+  history: number[]
   maxGold: number
   maxFood: number
   maxMilitary: number
-  maxTiles: number
+  isFocused: boolean
+  anyFocused: boolean
+  onFocus: () => void
 }) {
   const color = CIV_COLORS[civId] ?? "#6b7280"
   const icon = CIV_ICONS[civId] ?? "🏛️"
   const name = CIV_NAMES[civId] ?? civId
   const alive = state.is_alive
+  const justEliminated = !alive && prev?.is_alive === true
 
   return (
-    <div
-      className={`flex-1 rounded-xl border px-3 py-2.5 transition-all ${
+    <button
+      type="button"
+      onClick={onFocus}
+      aria-label={`Focus ${name} on the map`}
+      aria-pressed={isFocused}
+      className={`flex-1 text-left rounded-xl border px-3 py-2.5 transition-all cursor-pointer ${
         alive
           ? "bg-zinc-900/80 border-zinc-800"
-          : "bg-zinc-950 border-zinc-900 opacity-40"
+          : "bg-zinc-950 border-zinc-900 opacity-40 grayscale"
+      } ${justEliminated ? "civ-eliminate" : ""} ${
+        anyFocused && !isFocused ? "opacity-50" : ""
       }`}
-      style={alive ? { borderColor: `${color}33` } : {}}
+      style={
+        alive
+          ? { borderColor: isFocused ? color : `${color}33`, boxShadow: isFocused ? `0 0 12px ${color}44` : undefined }
+          : {}
+      }
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
@@ -82,6 +114,7 @@ function CivCard({
               style={{ background: `${color}20`, color }}
             >
               {state.tile_count} tiles
+              <Trend now={state.tile_count} before={prev?.tile_count} />
             </span>
             {!alive && (
               <span className="text-[10px] text-zinc-600 font-medium">
@@ -90,27 +123,22 @@ function CivCard({
             )}
           </div>
         </div>
+        {history.length >= 2 && <Sparkline points={history} color={color} />}
       </div>
 
       {/* Resource bars */}
       <div className="space-y-1.5">
         <ResourceBar
-          label="💰"
-          value={state.resources.gold}
-          max={maxGold}
-          color="#f59e0b"
+          label="💰" value={state.resources.gold} before={prev?.resources.gold}
+          max={maxGold} color="#f59e0b"
         />
         <ResourceBar
-          label="🌾"
-          value={state.resources.food}
-          max={maxFood}
-          color="#22c55e"
+          label="🌾" value={state.resources.food} before={prev?.resources.food}
+          max={maxFood} color="#22c55e"
         />
         <ResourceBar
-          label="⚔️"
-          value={state.resources.military}
-          max={maxMilitary}
-          color="#ef4444"
+          label="⚔️" value={state.resources.military} before={prev?.resources.military}
+          max={maxMilitary} color="#ef4444"
         />
       </div>
 
@@ -127,16 +155,48 @@ function CivCard({
           <RelDot key={otherId} civId={otherId} score={score as number} />
         ))}
       </div>
-    </div>
+    </button>
+  )
+}
+
+function Trend({ now, before }: { now: number; before: number | undefined }) {
+  if (before === undefined || now === before) return null
+  return now > before
+    ? <span className="ml-1 text-green-400">↑</span>
+    : <span className="ml-1 text-red-400">↓</span>
+}
+
+function Sparkline({ points, color }: { points: number[]; color: string }) {
+  const w = 44
+  const h = 16
+  const max = Math.max(...points, 1)
+  const min = Math.min(...points)
+  const range = Math.max(max - min, 1)
+  const coords = points
+    .map((v, i) => {
+      const x = (i / (points.length - 1)) * (w - 2) + 1
+      const y = h - 2 - ((v - min) / range) * (h - 4)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(" ")
+
+  return (
+    <svg width={w} height={h} className="flex-shrink-0 opacity-80" aria-hidden="true">
+      <polyline points={coords} fill="none" stroke={color} strokeWidth="1.25" />
+    </svg>
   )
 }
 
 function ResourceBar({
-  label, value, max, color,
+  label, value, before, max, color,
 }: {
-  label: string; value: number; max: number; color: string
+  label: string; value: number; before: number | undefined; max: number; color: string
 }) {
   const pct = Math.min(100, (value / max) * 100)
+  const delta =
+    before === undefined || Math.round(value) === Math.round(before)
+      ? null
+      : value > before
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[10px] w-4 flex-shrink-0">{label}</span>
@@ -149,11 +209,16 @@ function ResourceBar({
       <span className="text-[10px] text-zinc-500 w-8 text-right tabular-nums">
         {Math.round(value)}
       </span>
+      <span className="w-2 text-[10px]" aria-hidden="true">
+        {delta === true && <span className="text-green-400">↑</span>}
+        {delta === false && <span className="text-red-400">↓</span>}
+      </span>
     </div>
   )
 }
 
 function RelDot({ civId, score }: { civId: string; score: number }) {
+  const [hover, setHover] = useState(false)
   const color = CIV_COLORS[civId] ?? "#6b7280"
   const bg =
     score >= 60 ? "#22c55e" :
@@ -163,10 +228,28 @@ function RelDot({ civId, score }: { civId: string; score: number }) {
     "#ef4444"
 
   return (
-    <div
-      title={`${civId}: ${score}`}
-      className="w-2 h-2 rounded-full border"
-      style={{ background: bg, borderColor: `${color}66` }}
-    />
+    <span
+      className="relative inline-block"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <span
+        className="block w-2 h-2 rounded-full border"
+        style={{ background: bg, borderColor: `${color}66` }}
+        aria-label={`${CIV_NAMES[civId] ?? civId}: ${score} (${moodLabel(score)})`}
+      />
+      {hover && (
+        <span
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap
+                     bg-zinc-900 border border-zinc-700 rounded-md px-2 py-1 text-[10px] shadow-lg"
+        >
+          <span style={{ color }} className="font-semibold">
+            {CIV_NAMES[civId] ?? civId}
+          </span>
+          <span className="text-zinc-400"> {score > 0 ? `+${score}` : score} · </span>
+          <span style={{ color: bg }} className="font-medium">{moodLabel(score)}</span>
+        </span>
+      )}
+    </span>
   )
 }

@@ -15,7 +15,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 export const api = {
   health: () => apiFetch<{ status: string; db: string }>("/health"),
 
-  startSim: (params?: { grid_size?: number; max_turns?: number }) =>
+  startSim: (params?: { grid_size?: number; max_turns?: number; civ_ids?: string[] }) =>
     apiFetch<{ sim_id: string; status: string; stream: string }>("/sim/start", {
       method: "POST",
       body: JSON.stringify(params ?? {}),

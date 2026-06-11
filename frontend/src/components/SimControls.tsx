@@ -5,14 +5,27 @@ import { useSimulation } from "@/hooks/useSimulation"
 import { StreamStatus } from "@/hooks/useEventStream"
 import { Pause, Wifi, AlertTriangle } from "@/components/Icons"
 
+// Playback pacing: artificial delay applied between rendering incoming turns
+const SPEEDS = [
+  { label: "0.5×", ms: 2400 },
+  { label: "1×", ms: 1200 },
+  { label: "2×", ms: 600 },
+  { label: "4×", ms: 0 },
+] as const
+
 interface SimControlsProps {
   simId: string
   streamStatus: StreamStatus
   maxTurns?: number
+  reconnectAttempt?: number
 }
 
-export default function SimControls({ simId, streamStatus, maxTurns = 50 }: SimControlsProps) {
+export default function SimControls({
+  simId, streamStatus, maxTurns = 50, reconnectAttempt = 0,
+}: SimControlsProps) {
   const { current } = useSimStore()
+  const turnDelayMs = useSimStore((s) => s.turnDelayMs)
+  const setTurnDelayMs = useSimStore((s) => s.setTurnDelayMs)
   const { stopSim, isStopping } = useSimulation()
 
   const turn     = current?.turn ?? 0
@@ -56,6 +69,25 @@ export default function SimControls({ simId, streamStatus, maxTurns = 50 }: SimC
         </span>
       </div>
 
+      {/* Turn speed */}
+      <div className="flex items-center gap-0.5 flex-shrink-0" role="group" aria-label="Turn playback speed">
+        {SPEEDS.map((s) => (
+          <button
+            key={s.label}
+            onClick={() => setTurnDelayMs(s.ms)}
+            aria-pressed={turnDelayMs === s.ms}
+            title={s.ms === 0 ? "Render turns as they arrive" : `Pace turns ${s.ms / 1000}s apart`}
+            className={`text-[10px] px-1.5 py-1 rounded-md font-medium tabular-nums transition-colors ${
+              turnDelayMs === s.ms
+                ? "bg-zinc-700 text-zinc-100"
+                : "text-zinc-600 hover:text-zinc-300"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       {/* Stop button */}
       {isRunning && (
         <button
@@ -75,6 +107,11 @@ export default function SimControls({ simId, streamStatus, maxTurns = 50 }: SimC
         {streamStatus === "connecting" && (
           <span className="flex items-center gap-1 text-[10px] text-zinc-600 animate-pulse">
             <Wifi size={11} /> connecting
+          </span>
+        )}
+        {streamStatus === "reconnecting" && (
+          <span className="flex items-center gap-1 text-[10px] text-amber-500 animate-pulse">
+            <Wifi size={11} /> SIGNAL LOST — RECONNECTING ({reconnectAttempt}/3)
           </span>
         )}
         {streamStatus === "error" && (
