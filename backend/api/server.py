@@ -1,6 +1,13 @@
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Windows consoles often default to cp1252 — the simulation loop's unicode
+# log output would raise UnicodeEncodeError and kill the background task.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream and hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
 
 from config import settings
 from db.client import connect_db, close_db

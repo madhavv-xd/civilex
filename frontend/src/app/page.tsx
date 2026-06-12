@@ -63,7 +63,7 @@ export default function HomePage() {
       .finally(() => setSimsLoaded(true))
   }, [])
 
-  const runningSim = sims.find((s) => s.status === "running") ?? null
+  const runningSim = sims.find((s) => s.status === "running" || s.status === "paused") ?? null
   const runningSimId = runningSim?.sim_id ?? null
 
   // Keep the active operation card fresh
@@ -103,7 +103,7 @@ export default function HomePage() {
       ironhold: completed.filter((s) => s.winner === "ironhold").length,
       verdant: completed.filter((s) => s.winner === "verdant").length,
       avgTurns,
-      running: sims.filter((s) => s.status === "running").length,
+      running: sims.filter((s) => s.status === "running" || s.status === "paused").length,
     }
   }, [sims])
 
@@ -358,7 +358,7 @@ export default function HomePage() {
           {runningSim && (
             <div className="rise px-4 pt-6" style={{ animationDelay: "200ms" }}>
               <div className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest mb-2 animate-pulse">
-                ⦿ Active Operation
+                ⦿ {runningSim.status === "paused" ? "Paused Operation" : "Active Operation"}
               </div>
               <Link
                 href={`/simulation/${runningSim.sim_id}`}
