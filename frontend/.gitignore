@@ -1,6 +1,8 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================================
+# CivilEx Frontend — Next.js / React / TypeScript
+# ============================================================
 
-# Dependencies
+# ── Dependencies ────────────────────────────────────────────
 node_modules/
 /.pnp
 .pnp.*
@@ -10,26 +12,26 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
-# Testing
-/coverage
-/.nyc_output
-cypress/screenshots/
-cypress/videos/
-
-# Next.js / React build outputs
+# ── Next.js build outputs ───────────────────────────────────
 /.next/
 /out/
 /build
 /dist
 
-# Debug logs
+# ── Testing / coverage ──────────────────────────────────────
+/coverage
+/.nyc_output
+cypress/screenshots/
+cypress/videos/
+
+# ── Debug logs ──────────────────────────────────────────────
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 lerna-debug.log*
 
-# Environment files (local configuration)
+# ── Environment files / secrets ─────────────────────────────
 .env
 .env.local
 .env.development.local
@@ -37,15 +39,16 @@ lerna-debug.log*
 .env.production.local
 .env*.local
 *.env
+!.env.example
 
-# Vercel
-.vercel
-
-# TypeScript
+# ── TypeScript build info ───────────────────────────────────
 *.tsbuildinfo
 next-env.d.ts
 
-# IDEs / Editors
+# ── Vercel ──────────────────────────────────────────────────
+.vercel
+
+# ── IDEs / editors ──────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
@@ -55,7 +58,12 @@ next-env.d.ts
 *.njsproj
 *.sln
 
-# Operating System files
+# ── Operating system files ──────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 db.db
+
+# ── Tool caches ─────────────────────────────────────────────
+.codectx_cache/
+.codectx-cache/
