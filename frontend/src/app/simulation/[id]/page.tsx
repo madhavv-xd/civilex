@@ -46,7 +46,7 @@ export default function SimulationPage() {
     error: streamError,
     reconnectAttempt,
   } = useEventStream(simId)
-  const { stopSim, isStopping } = useSimulation()
+  const { pauseSim, resumeSim, isPausing, isResuming } = useSimulation()
 
   const viewerTab = useUiStore((s) => s.viewerTab)
   const setViewerTab = useUiStore((s) => s.setViewerTab)
@@ -58,6 +58,7 @@ export default function SimulationPage() {
 
   const isDone      = current?.status === "completed"
   const isRunning   = current?.status === "running"
+  const isPaused    = current?.status === "paused"
   const totalTurns  = current?.config?.max_turns ?? 50
   const hasWorld    = !!worldState
 
@@ -105,7 +106,8 @@ export default function SimulationPage() {
     switch (e.key) {
       case " ":
         e.preventDefault()
-        if (isRunning && !isStopping) stopSim(simId)
+        if (isRunning && !isPausing) pauseSim(simId)
+        else if (isPaused && !isResuming) resumeSim(simId)
         break
       case "ArrowLeft":
         if (isDone) {
@@ -133,8 +135,8 @@ export default function SimulationPage() {
         else if (fullscreenMap) setFullscreenMap(false)
         break
     }
-  }, [isRunning, isStopping, isDone, simId, stopSim, replay, current?.turn,
-      totalTurns, showSummary, showWin, fullscreenMap, setFullscreenMap])
+  }, [isRunning, isPaused, isPausing, isResuming, isDone, simId, pauseSim, resumeSim,
+      replay, current?.turn, totalTurns, showSummary, showWin, fullscreenMap, setFullscreenMap])
 
   useEffect(() => {
     window.addEventListener("keydown", handleKey)

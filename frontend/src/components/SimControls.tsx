@@ -3,7 +3,7 @@
 import { useSimStore } from "@/store/simStore"
 import { useSimulation } from "@/hooks/useSimulation"
 import { StreamStatus } from "@/hooks/useEventStream"
-import { Pause, Wifi, AlertTriangle } from "@/components/Icons"
+import { Play, Pause, Stop, Wifi, AlertTriangle } from "@/components/Icons"
 
 // Playback pacing: artificial delay applied between rendering incoming turns
 const SPEEDS = [
@@ -26,13 +26,17 @@ export default function SimControls({
   const { current } = useSimStore()
   const turnDelayMs = useSimStore((s) => s.turnDelayMs)
   const setTurnDelayMs = useSimStore((s) => s.setTurnDelayMs)
-  const { stopSim, isStopping } = useSimulation()
+  const {
+    pauseSim, resumeSim, stopSim,
+    isPausing, isResuming, isStopping,
+  } = useSimulation()
 
   const turn     = current?.turn ?? 0
   const status   = current?.status ?? "running"
   const progress = Math.round((turn / maxTurns) * 100)
 
-  const isRunning = status === "running" && streamStatus === "connected"
+  const isRunning = status === "running"
+  const isLive    = isRunning && streamStatus === "connected"
   const isPaused  = status === "paused"
   const isDone    = status === "completed"
 
@@ -52,7 +56,7 @@ export default function SimControls({
           className="h-full rounded-full transition-all duration-700"
           style={{
             width: `${progress}%`,
-            background: isDone ? "#eab308" : isRunning ? "#6366f1" : "#6b7280",
+            background: isDone ? "#eab308" : isLive ? "#6366f1" : "#6b7280",
           }}
         />
       </div>
@@ -60,7 +64,7 @@ export default function SimControls({
       {/* Status dot + label */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <div className={`w-1.5 h-1.5 rounded-full ${
-          isRunning ? "bg-green-500 animate-pulse" :
+          isLive    ? "bg-green-500 animate-pulse" :
           isPaused  ? "bg-yellow-500" :
           isDone    ? "bg-amber-400" : "bg-zinc-600"
         }`} />
@@ -88,17 +92,43 @@ export default function SimControls({
         ))}
       </div>
 
-      {/* Stop button */}
+      {/* Pause / Resume toggle */}
       {isRunning && (
         <button
-          onClick={() => stopSim(simId)}
-          disabled={isStopping}
+          onClick={() => pauseSim(simId)}
+          disabled={isPausing}
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-zinc-700
                      text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-colors
                      disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
         >
           <Pause size={11} />
-          {isStopping ? "Stopping…" : "Pause"}
+          {isPausing ? "Pausing…" : "Pause"}
+        </button>
+      )}
+      {isPaused && (
+        <button
+          onClick={() => resumeSim(simId)}
+          disabled={isResuming}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-indigo-700
+                     text-indigo-300 hover:border-indigo-500 hover:bg-indigo-600/20 transition-colors
+                     disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+        >
+          <Play size={11} />
+          {isResuming ? "Resuming…" : "Resume"}
+        </button>
+      )}
+
+      {/* Stop button */}
+      {(isRunning || isPaused) && (
+        <button
+          onClick={() => stopSim(simId)}
+          disabled={isStopping}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-red-900/70
+                     text-red-400/80 hover:border-red-700 hover:text-red-300 transition-colors
+                     disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+        >
+          <Stop size={11} />
+          {isStopping ? "Stopping…" : "Stop"}
         </button>
       )}
 

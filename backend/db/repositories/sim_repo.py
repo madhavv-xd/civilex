@@ -29,22 +29,40 @@ async def get_simulation(sim_id: str) -> Simulation | None:
         return None
 
 
+def _oid(sim_id: str) -> ObjectId | None:
+    try:
+        return ObjectId(sim_id)
+    except Exception:
+        return None
+
+
+async def _set_fields(sim_id: str, fields: dict) -> None:
+    """Atomic $set on a simulation — never clobbers fields written concurrently
+    (e.g. a pause/stop issued from the API while the loop updates the turn)."""
+    oid = _oid(sim_id)
+    if oid is None:
+        return
+    fields["updated_at"] = datetime.utcnow()
+    await Simulation.find_one(Simulation.id == oid).update({"$set": fields})
+
+
 async def update_sim_turn(sim_id: str, turn: int) -> None:
     """Update the current turn counter."""
-    sim = await get_simulation(sim_id)
-    if sim:
-        sim.turn = turn
-        sim.updated_at = datetime.utcnow()
-        await sim.save()
+    await _set_fields(sim_id, {"turn": turn})
 
 
 async def update_sim_status(sim_id: str, status: SimStatus) -> None:
     """Update simulation status."""
-    sim = await get_simulation(sim_id)
-    if sim:
-        sim.status = status
-        sim.updated_at = datetime.utcnow()
-        await sim.save()
+    await _set_fields(sim_id, {"status": status})
+
+
+async def mark_sim_stopped(sim_id: str) -> None:
+    """Terminal stop requested by the user — completed with no winner."""
+    await _set_fields(sim_id, {
+        "status": SimStatus.completed,
+        "winner_reason": "stopped",
+        "completed_at": datetime.utcnow(),
+    })
 
 
 async def set_sim_winner(
@@ -54,15 +72,13 @@ async def set_sim_winner(
     final_narrative: str,
 ) -> None:
     """Mark a simulation as complete with a winner."""
-    sim = await get_simulation(sim_id)
-    if sim:
-        sim.winner = winner_id
-        sim.winner_reason = win_type
-        sim.final_narrative = final_narrative
-        sim.status = SimStatus.completed
-        sim.completed_at = datetime.utcnow()
-        sim.updated_at = datetime.utcnow()
-        await sim.save()
+    await _set_fields(sim_id, {
+        "winner": winner_id,
+        "winner_reason": win_type,
+        "final_narrative": final_narrative,
+        "status": SimStatus.completed,
+        "completed_at": datetime.utcnow(),
+    })
 
 
 async def get_all_simulations(limit: int = 20) -> list[Simulation]:

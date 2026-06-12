@@ -7,7 +7,7 @@ interface SimStore {
   turnDelayMs: number
   setCurrent: (sim: Simulation | null) => void
   updateStatus: (status: Simulation["status"]) => void
-  incrementTurn: () => void
+  setTurn: (turn: number) => void
   setTurnDelayMs: (ms: number) => void
 }
 
@@ -24,10 +24,8 @@ export const useSimStore = create<SimStore>((set) => ({
       state.current ? { current: { ...state.current, status } } : {}
     ),
 
-  incrementTurn: () =>
+  setTurn: (turn) =>
     set((state) =>
-      state.current
-        ? { current: { ...state.current, turn: state.current.turn + 1 } }
-        : {}
+      state.current ? { current: { ...state.current, turn } } : {}
     ),
 }))

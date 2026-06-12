@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from db.client import ping_db
 from db.repositories import (
     create_simulation, get_simulation, update_sim_status,
-    get_all_simulations, get_events_for_sim, get_all_turns,
-    delete_simulation,
+    mark_sim_stopped, get_all_simulations, get_events_for_sim,
+    get_all_turns, delete_simulation,
 )
 from models.simulation import SimConfig, SimStatus
 from simulation.world_state import generate_world, world_snapshot_to_dict
@@ -74,15 +74,49 @@ async def start_simulation(req: StartSimRequest, background_tasks: BackgroundTas
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/sim/{sim_id}/stop")
-async def stop_simulation(sim_id: str):
+@router.post("/sim/{sim_id}/pause")
+async def pause_simulation(sim_id: str):
+    """Pause a running simulation — the loop holds after the current turn."""
     sim = await get_simulation(sim_id)
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
-    if sim.status == SimStatus.completed:
-        raise HTTPException(status_code=400, detail="Simulation already completed")
+    if sim.status != SimStatus.running:
+        raise HTTPException(status_code=400, detail=f"Cannot pause a {sim.status.value} simulation")
     await update_sim_status(sim_id, SimStatus.paused)
+    await sse_manager.publish(sim_id, {"type": "sim_paused", "turn": sim.turn})
     return {"sim_id": sim_id, "status": "paused"}
+
+
+@router.post("/sim/{sim_id}/resume")
+async def resume_simulation(sim_id: str):
+    """Resume a paused simulation — the loop picks up on its next poll."""
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    if sim.status != SimStatus.paused:
+        raise HTTPException(status_code=400, detail=f"Cannot resume a {sim.status.value} simulation")
+    await update_sim_status(sim_id, SimStatus.running)
+    await sse_manager.publish(sim_id, {"type": "sim_resumed", "turn": sim.turn})
+    return {"sim_id": sim_id, "status": "running"}
+
+
+@router.post("/sim/{sim_id}/stop")
+async def stop_simulation(sim_id: str):
+    """Permanently stop a simulation — the loop exits after the current turn."""
+    sim = await get_simulation(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    if sim.status in (SimStatus.completed, SimStatus.failed):
+        raise HTTPException(status_code=400, detail="Simulation already finished")
+    await mark_sim_stopped(sim_id)
+    await sse_manager.publish(sim_id, {
+        "type":            "sim_end",
+        "turn":            sim.turn,
+        "winner":          None,
+        "winner_reason":   "stopped",
+        "final_narrative": "The simulation was halted by the observer.",
+    })
+    return {"sim_id": sim_id, "status": "completed", "stopped": True}
 
 
 @router.delete("/sim/{sim_id}")

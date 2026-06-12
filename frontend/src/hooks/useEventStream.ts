@@ -63,6 +63,7 @@ export function useEventStream(simId: string | null) {
   const endedRef = useRef(false)
   const turnQueueRef = useRef<TurnPayload[]>([])
   const processingRef = useRef(false)
+  const lastTurnRef = useRef(0)
 
   const disconnect = useCallback(() => {
     endedRef.current = true
@@ -80,18 +81,24 @@ export function useEventStream(simId: string | null) {
     endedRef.current = false
     retryRef.current = 0
     turnQueueRef.current = []
+    lastTurnRef.current = 0
     useEventStore.getState().reset()
 
     const applyTurn = (payload: TurnPayload) => {
+      // The server replays the latest turn snapshot to (re)connecting
+      // clients — skip turns we've already rendered.
+      if (payload.turn <= lastTurnRef.current) return
+      lastTurnRef.current = payload.turn
+
       const world = useWorldStore.getState()
-      const { incrementTurn } = useSimStore.getState()
+      const { setTurn } = useSimStore.getState()
       const { addEvents, addNarration } = useEventStore.getState()
 
       const shifts = computeRelationshipShifts(
         world.civStates, payload.civ_states, payload.turn, simId
       )
 
-      incrementTurn()
+      setTurn(payload.turn)
       world.setWorldState(payload.world_state)
       world.setCivStates(payload.civ_states)
       useWorldStore.getState().recordTurnStats()
@@ -150,6 +157,14 @@ export function useEventStream(simId: string | null) {
       es.addEventListener("turn_complete", (e: MessageEvent) => {
         turnQueueRef.current.push(JSON.parse(e.data) as TurnPayload)
         void processQueue()
+      })
+
+      es.addEventListener("sim_paused", () => {
+        useSimStore.getState().updateStatus("paused")
+      })
+
+      es.addEventListener("sim_resumed", () => {
+        useSimStore.getState().updateStatus("running")
       })
 
       es.addEventListener("sim_end", (e: MessageEvent) => {

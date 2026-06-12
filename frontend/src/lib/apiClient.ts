@@ -21,6 +21,16 @@ export const api = {
       body: JSON.stringify(params ?? {}),
     }),
 
+  pauseSim: (simId: string) =>
+    apiFetch<{ sim_id: string; status: string }>(`/sim/${simId}/pause`, {
+      method: "POST",
+    }),
+
+  resumeSim: (simId: string) =>
+    apiFetch<{ sim_id: string; status: string }>(`/sim/${simId}/resume`, {
+      method: "POST",
+    }),
+
   stopSim: (simId: string) =>
     apiFetch<{ sim_id: string; status: string }>(`/sim/${simId}/stop`, {
       method: "POST",

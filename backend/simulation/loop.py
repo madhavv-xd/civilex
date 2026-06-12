@@ -7,6 +7,8 @@ Defines SimState and the full turn-cycle graph:
 """
 import asyncio
 import json
+from functools import lru_cache
+from pathlib import Path
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, END
@@ -16,17 +18,34 @@ from agents.civ_agent import get_all_civ_decisions
 from agents.world_engine import resolve_turn
 from agents.event_agent import roll_world_event
 from agents.narrator_agent import narrate_turn
-from agents.memory_manager import refresh_all_memories
+from agents.memory_manager import refresh_all_memories, should_refresh
 from simulation.judge import check_win
 from simulation.world_state import generate_world, world_snapshot_to_dict
 from simulation.civilizations import build_initial_civ_states
 from db.repositories import (
     create_simulation, get_simulation, update_sim_turn,
-    update_sim_status, set_sim_winner, is_sim_paused,
+    update_sim_status, set_sim_winner, mark_sim_stopped,
     save_turn, save_events, get_events_as_dicts,
 )
 from models.simulation import SimStatus, SimConfig
 from models.civ_state import CivState, Resources
+
+
+# How often the loop re-checks DB status while paused, and how long a sim may
+# stay paused before it is auto-stopped (prevents zombie background tasks).
+PAUSE_POLL_SECONDS = 1.0
+PAUSE_TIMEOUT_SECONDS = 30 * 60
+
+# Cap on events fed into memory compression so prompts stay bounded late-game
+MEMORY_EVENT_WINDOW = 150
+
+_CONFIGS_DIR = Path(__file__).resolve().parents[2] / "configs"
+
+
+@lru_cache(maxsize=1)
+def _load_world_params() -> dict:
+    with open(_CONFIGS_DIR / "world_params.json") as f:
+        return json.load(f)
 
 
 # ── State definition ──────────────────────────────────────────────────────────
@@ -34,6 +53,7 @@ from models.civ_state import CivState, Resources
 class SimState(TypedDict):
     sim_id:           str
     turn:             int
+    max_turns:        int
     world_snapshot:   dict
     civ_states:       dict
     decisions:        dict
@@ -66,24 +86,39 @@ def _civ_doc_to_dict(state: CivState) -> dict:
 # ── Graph nodes ───────────────────────────────────────────────────────────────
 
 async def increment_turn(state: SimState) -> SimState:
+    sim_id = state["sim_id"]
+
+    # Wait here while paused; exit the loop if stopped/failed externally.
+    waited = 0.0
+    announced_pause = False
+    while True:
+        sim = await get_simulation(sim_id)
+        if not sim or sim.status in (SimStatus.completed, SimStatus.failed):
+            return {**state, "status": "stopped"}
+        if sim.status != SimStatus.paused:
+            break
+        if waited >= PAUSE_TIMEOUT_SECONDS:
+            print(f"  ⏹ Pause timed out — stopping simulation {sim_id}")
+            await mark_sim_stopped(sim_id)
+            return {**state, "status": "stopped"}
+        if not announced_pause:
+            print(f"  ⏸ Simulation {sim_id} paused — waiting for resume...")
+            announced_pause = True
+        await asyncio.sleep(PAUSE_POLL_SECONDS)
+        waited += PAUSE_POLL_SECONDS
+
     new_turn = state["turn"] + 1
     print(f"\n{'═'*50}")
     print(f"  Turn {new_turn} starting...")
     print(f"{'═'*50}")
 
-    # Check if simulation was paused externally
-    paused = await is_sim_paused(state["sim_id"])
-    if paused:
-        return {**state, "turn": new_turn, "status": "paused"}
-
-    await update_sim_turn(state["sim_id"], new_turn)
-    await update_sim_status(state["sim_id"], SimStatus.running)
+    await update_sim_turn(sim_id, new_turn)
 
     return {**state, "turn": new_turn, "status": "running"}
 
 
 async def run_civ_agents(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return state
 
     print(f"  🤖 Agents deciding (parallel)...")
@@ -104,14 +139,12 @@ async def run_civ_agents(state: SimState) -> SimState:
 
 
 async def run_world_engine(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return state
 
     print(f"  ⚙️  World engine resolving...")
 
-    import json as _json
-    with open("../configs/world_params.json") as f:
-        world_params = _json.load(f)
+    world_params = _load_world_params()
 
     updated_states, updated_world, events = resolve_turn(
         turn=state["turn"],
@@ -132,7 +165,7 @@ async def run_world_engine(state: SimState) -> SimState:
 
 
 async def run_event_agent(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return state
 
     print(f"  🌪  Rolling for world event...")
@@ -154,7 +187,7 @@ async def run_event_agent(state: SimState) -> SimState:
 
 
 async def run_narrator(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return state
 
     print(f"  📜 Narrator writing...")
@@ -171,10 +204,16 @@ async def run_narrator(state: SimState) -> SimState:
 
 
 async def refresh_memory(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
+        return state
+
+    # Memory only compresses every COMPRESS_EVERY turns — skip the full
+    # event-log fetch on all other turns.
+    if not should_refresh(state["turn"]):
         return state
 
     event_log = await get_events_as_dicts(state["sim_id"])
+    event_log = event_log[-MEMORY_EVENT_WINDOW:]
 
     summaries = await refresh_all_memories(
         turn=state["turn"],
@@ -187,7 +226,7 @@ async def refresh_memory(state: SimState) -> SimState:
 
 
 async def persist_turn(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return state
 
     sim_id = state["sim_id"]
@@ -213,10 +252,11 @@ async def persist_turn(state: SimState) -> SimState:
     await save_events(sim_id, turn, all_events)
 
     # Save updated civ states
+    civ_docs = []
     for civ_id, civ_dict in state["civ_states"].items():
         decision = state.get("decisions", {}).get(civ_id, {})
         res = civ_dict.get("resources", {})
-        civ_doc = CivState(
+        civ_docs.append(CivState(
             sim_id=sim_id,
             turn=turn,
             civ_id=civ_id,
@@ -234,8 +274,9 @@ async def persist_turn(state: SimState) -> SimState:
             memory_summary=state.get("memory_summaries", {}).get(civ_id, ""),
             last_action=decision.get("action"),
             last_reasoning=decision.get("reasoning"),
-        )
-        await civ_doc.insert()
+        ))
+    if civ_docs:
+        await CivState.insert_many(civ_docs)
 
     # Emit SSE event
     from api.sse import sse_manager
@@ -255,17 +296,14 @@ async def persist_turn(state: SimState) -> SimState:
 
 
 async def check_winner(state: SimState) -> SimState:
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return state
-
-    sim_config = await get_simulation(state["sim_id"])
-    max_turns  = sim_config.config.max_turns if sim_config else 50
 
     result = check_win(
         turn=state["turn"],
         civ_states=state["civ_states"],
         world_snapshot=state["world_snapshot"],
-        max_turns=max_turns,
+        max_turns=state.get("max_turns", 50),
     )
 
     if result:
@@ -301,7 +339,7 @@ async def check_winner(state: SimState) -> SimState:
 def should_continue(state: SimState) -> str:
     if state.get("winner"):
         return "end"
-    if state.get("status") == "paused":
+    if state.get("status") == "stopped":
         return "end"
     return "continue"
 
@@ -371,6 +409,7 @@ async def run_simulation_loop(sim_id: str) -> None:
         initial_state: SimState = {
             "sim_id":           sim_id,
             "turn":             0,
+            "max_turns":        sim.config.max_turns,
             "world_snapshot":   world_dict,
             "civ_states":       civ_states,
             "decisions":        {},
@@ -383,6 +422,10 @@ async def run_simulation_loop(sim_id: str) -> None:
             "status":           "running",
         }
 
+        # Mark running once, here — turn updates never touch status again,
+        # so a pause/stop from the API can't be overwritten by the loop.
+        await update_sim_status(sim_id, SimStatus.running)
+
         # Emit sim_start event
         from api.sse import sse_manager
         await sse_manager.publish(sim_id, {
@@ -392,9 +435,13 @@ async def run_simulation_loop(sim_id: str) -> None:
             "civ_states":     civ_states,
         })
 
-        # Compile and run the graph
+        # Compile and run the graph. Each turn is ~8 graph supersteps, so the
+        # default recursion limit (25) would kill the sim after ~3 turns.
         graph = build_simulation_graph()
-        await graph.ainvoke(initial_state)
+        await graph.ainvoke(
+            initial_state,
+            config={"recursion_limit": sim.config.max_turns * 10 + 50},
+        )
 
         print(f"\n✅ Simulation {sim_id} complete")
 
@@ -407,3 +454,6 @@ async def run_simulation_loop(sim_id: str) -> None:
             "message": str(e),
         })
         raise
+    finally:
+        from api.sse import sse_manager
+        sse_manager.close_channel(sim_id)
