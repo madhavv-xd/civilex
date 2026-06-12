@@ -4,7 +4,7 @@ import { useEffect, useRef, useMemo, useState } from "react"
 import * as d3 from "d3"
 import { useWorldStore } from "@/store/worldStore"
 import { useUiStore } from "@/store/uiStore"
-import { hexToPixel, gridBounds, HEX_SIZE } from "@/lib/hexUtils"
+import { hexToPixel, gridBounds, tilesBounds, HEX_SIZE } from "@/lib/hexUtils"
 import { CIV_COLORS, CIV_NAMES, TILE_COLORS } from "@/lib/civColors"
 import type { HexTile } from "@/types"
 
@@ -36,7 +36,12 @@ export default function HexGrid() {
 
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
-  const bounds = useMemo(() => gridBounds(15, HEX_SIZE), [])
+  // Derive bounds from the actual tiles so any grid size renders correctly
+  const tiles = worldState?.tiles
+  const bounds = useMemo(
+    () => (tiles?.length ? tilesBounds(tiles, HEX_SIZE) : gridBounds(15, HEX_SIZE)),
+    [tiles]
+  )
 
   const center = (t: { q: number; r: number }) => {
     const { x, y } = hexToPixel(t.q, t.r, HEX_SIZE)
@@ -103,14 +108,23 @@ export default function HexGrid() {
       .attr("stroke-width", (d) => (d.owner ? 1.5 : 0.5))
       .style("cursor", "pointer")
       .on("mouseenter", function (event: MouseEvent, d) {
-        d3.select(this).attr("fill-opacity", 0.75)
+        d3.select(this)
+          .raise()
+          .attr("fill-opacity", 0.8)
+          .attr("stroke", "#fafafa")
+          .attr("stroke-width", 2)
         const rect = containerRef.current!.getBoundingClientRect()
         setTooltip({ x: event.clientX - rect.left, y: event.clientY - rect.top, tile: d })
       })
-      .on("mouseleave", function () {
-        d3.select(this).attr("fill-opacity", 1)
+      .on("mouseleave", function (_event, d) {
+        d3.select(this)
+          .attr("fill-opacity", 1)
+          .attr("stroke", getTileStroke(d))
+          .attr("stroke-width", d.owner ? 1.5 : 0.5)
         setTooltip(null)
       })
+
+    hexes.exit().remove()
 
     // Re-bind data so tooltips show fresh tile values, but only animate changed tiles
     const all = hexGroup
@@ -230,6 +244,14 @@ export default function HexGrid() {
       .call(zoomRef.current.transform, d3.zoomIdentity)
   }
 
+  const zoomBy = (factor: number) => {
+    if (!svgRef.current || !zoomRef.current) return
+    d3.select(svgRef.current)
+      .transition()
+      .duration(250)
+      .call(zoomRef.current.scaleBy, factor)
+  }
+
   if (!worldState) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -251,8 +273,15 @@ export default function HexGrid() {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden bg-zinc-950 rounded-xl"
+      className="relative w-full h-full overflow-hidden rounded-xl
+                 bg-[radial-gradient(ellipse_at_center,#121217_0%,#09090b_75%)]"
     >
+      {/* Vignette */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none
+                   bg-[radial-gradient(ellipse_at_center,transparent_55%,rgba(0,0,0,0.45)_100%)]"
+      />
       <svg
         ref={svgRef}
         width="100%"
@@ -273,16 +302,37 @@ export default function HexGrid() {
         </g>
       </svg>
 
-      {/* Reset view */}
-      <button
-        onClick={resetView}
-        aria-label="Reset map view"
-        className="absolute top-3 right-3 text-[10px] px-2.5 py-1.5 rounded-lg border border-zinc-700
-                   bg-zinc-900/80 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200
-                   font-medium uppercase tracking-wider transition-colors"
-      >
-        Reset View
-      </button>
+      {/* Map controls */}
+      <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+        <div className="flex rounded-lg border border-zinc-700 bg-zinc-900/80 overflow-hidden">
+          <button
+            onClick={() => zoomBy(1.4)}
+            aria-label="Zoom in"
+            className="w-7 h-7 flex items-center justify-center text-zinc-400
+                       hover:text-zinc-100 hover:bg-zinc-800 transition-colors text-sm font-bold"
+          >
+            +
+          </button>
+          <span className="w-px bg-zinc-700" aria-hidden="true" />
+          <button
+            onClick={() => zoomBy(1 / 1.4)}
+            aria-label="Zoom out"
+            className="w-7 h-7 flex items-center justify-center text-zinc-400
+                       hover:text-zinc-100 hover:bg-zinc-800 transition-colors text-sm font-bold"
+          >
+            −
+          </button>
+        </div>
+        <button
+          onClick={resetView}
+          aria-label="Reset map view"
+          className="text-[10px] px-2.5 py-1.5 rounded-lg border border-zinc-700
+                     bg-zinc-900/80 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200
+                     font-medium uppercase tracking-wider transition-colors"
+        >
+          Reset View
+        </button>
+      </div>
 
       {/* Legend — pinned bottom-left, unaffected by zoom */}
       <div className="absolute bottom-3 left-3 bg-zinc-900/85 border border-zinc-800 rounded-lg

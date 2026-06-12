@@ -91,6 +91,116 @@ html, body {
   50%      { opacity: 1; }
 }
 
+/* ── Hero hexagon mark: slow spin + civ-color shift ───────────── */
+.hex-shape {
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+@keyframes hex-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes hex-shift {
+  0%, 100% { background: #6366f1; }
+  20%      { background: #C0392B; }
+  40%      { background: #27AE60; }
+  60%      { background: #F39C12; }
+  80%      { background: #8E44AD; }
+}
+.hex-mark {
+  animation: hex-shift 8s ease-in-out infinite, hex-spin 24s linear infinite;
+}
+.hex-mark-glow {
+  animation: hex-shift 8s ease-in-out infinite;
+  filter: blur(22px);
+  opacity: 0.5;
+}
+
+/* ── Hero title glow ──────────────────────────────────────────── */
+.title-glow {
+  text-shadow: 0 0 32px rgba(99, 102, 241, 0.45);
+}
+
+/* ── Background blobs drift slowly ────────────────────────────── */
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(40px, 24px) scale(1.08); }
+}
+.blob-drift {
+  animation: blob-drift 14s ease-in-out infinite;
+}
+.blob-drift-reverse {
+  animation: blob-drift 18s ease-in-out infinite reverse;
+}
+
+/* ── Hex map unit markers breathe ─────────────────────────────── */
+@keyframes unit-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+rect.unit {
+  animation: unit-pulse 2.2s ease-in-out infinite;
+}
+
+/* ── Config panel expand-in ───────────────────────────────────── */
+@keyframes config-enter {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.config-enter {
+  animation: config-enter 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Boot-up entrance: elements rise in with stagger ──────────── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* ── Civ card hover: border + glow in the civ's own color ─────── */
+.civ-card {
+  transition: border-color 300ms ease, box-shadow 300ms ease, transform 300ms ease;
+}
+.civ-card:hover {
+  border-color: var(--civ);
+  box-shadow: 0 0 24px 0 var(--civ-glow);
+  transform: translateX(2px);
+}
+/* Light sweep across the card on hover */
+.civ-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, var(--civ-glow) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-position: 135% 0;
+  pointer-events: none;
+  transition: background-position 700ms ease;
+}
+.civ-card:hover::after {
+  background-position: -35% 0;
+}
+.civ-emblem {
+  transition: transform 300ms ease, filter 300ms ease;
+}
+.civ-card:hover .civ-emblem {
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 8px var(--civ-glow));
+}
+
+/* ── Living gradient progress bar ─────────────────────────────── */
+@keyframes progress-flow {
+  from { background-position: 0% 50%; }
+  to   { background-position: 200% 50%; }
+}
+.progress-flow {
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+  background-size: 200% 100%;
+  animation: progress-flow 3s linear infinite;
+}
+
 /* ── Reduced motion ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .feed-enter,
@@ -101,9 +211,24 @@ html, body {
   .win-trophy,
   .win-narrative,
   .hex-pulse,
+  .hex-mark,
+  .hex-mark-glow,
+  .blob-drift,
+  .blob-drift-reverse,
+  .rise,
+  .config-enter,
+  rect.unit,
+  .progress-flow,
   .animate-pulse,
   .animate-spin {
     animation: none !important;
+  }
+  .hex-mark,
+  .hex-mark-glow {
+    background: #6366f1;
+  }
+  .progress-flow {
+    background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
   }
   .civ-eliminate {
     filter: grayscale(1);

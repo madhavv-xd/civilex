@@ -14,6 +14,22 @@ export function hexCorners(cx: number, cy: number, size = HEX_SIZE): string {
   }).join(" ")
 }
 
+/** Pixel bounds of an arbitrary set of tiles — works for any grid size. */
+export function tilesBounds(tiles: Array<{ q: number; r: number }>, size = HEX_SIZE) {
+  let minX = Infinity, maxX = -Infinity
+  let minY = Infinity, maxY = -Infinity
+
+  for (const t of tiles) {
+    const { x, y } = hexToPixel(t.q, t.r, size)
+    minX = Math.min(minX, x - size)
+    maxX = Math.max(maxX, x + size)
+    minY = Math.min(minY, y - size)
+    maxY = Math.max(maxY, y + size)
+  }
+
+  return { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY }
+}
+
 export function gridBounds(gridSize = 15, size = HEX_SIZE) {
   const offset = gridSize / 2
   let minX = Infinity, maxX = -Infinity

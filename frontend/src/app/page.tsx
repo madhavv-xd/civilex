@@ -2,20 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { api } from "@/lib/apiClient"
 import { useSimulation } from "@/hooks/useSimulation"
 import { CIV_COLORS, CIV_NAMES, CIV_ICON_COMPONENTS } from "@/lib/civColors"
 import {
   Globe, Play, Scroll, Database, AlertTriangle,
-  Trophy, Sword2, Leaf, Coins, Eye, ArrowRight,
+  Trophy, ArrowRight, ChevronRight,
 } from "@/components/Icons"
 
+const HexFieldCanvas = dynamic(() => import("@/components/HexFieldCanvas"), {
+  ssr: false,
+})
+
 const CIVS = [
-  { id: "ironhold",  name: "The Ironhold Confederacy",    trait: "Militaristic",  color: "#C0392B", Icon: Sword2, desc: "Masters of war and iron discipline" },
-  { id: "verdant",   name: "The Verdant Pact",            trait: "Diplomatic",    color: "#27AE60", Icon: Leaf,   desc: "Builders of alliances and green lands" },
-  { id: "merchants", name: "The Ashborne Merchant Guild", trait: "Transactional", color: "#F39C12", Icon: Coins,  desc: "Wealth is the only true power" },
-  { id: "conclave",  name: "The Silent Conclave",         trait: "Isolationist",  color: "#8E44AD", Icon: Eye,    desc: "Hidden knowledge, hidden strength" },
+  { id: "ironhold",  name: "The Ironhold Confederacy",    trait: "Militaristic",  color: "#C0392B", desc: "Masters of war and iron discipline" },
+  { id: "verdant",   name: "The Verdant Pact",            trait: "Diplomatic",    color: "#27AE60", desc: "Builders of alliances and green lands" },
+  { id: "merchants", name: "The Ashborne Merchant Guild", trait: "Transactional", color: "#F39C12", desc: "Wealth is the only true power" },
+  { id: "conclave",  name: "The Silent Conclave",         trait: "Isolationist",  color: "#8E44AD", desc: "Hidden knowledge, hidden strength" },
 ]
+
+const PLAYSTYLES: Record<string, string> = {
+  Militaristic:  "Conquer & Hold",
+  Diplomatic:    "Forge & Unite",
+  Transactional: "Trade & Accumulate",
+  Isolationist:  "Fortify & Endure",
+}
 
 interface SimRow {
   sim_id: string
@@ -26,6 +38,7 @@ interface SimRow {
   civ_ids: string[]
   created_at: string
   completed_at: string | null
+  max_turns?: number
 }
 
 export default function HomePage() {
@@ -51,25 +64,34 @@ export default function HomePage() {
   }, [])
 
   const runningSim = sims.find((s) => s.status === "running") ?? null
+  const runningSimId = runningSim?.sim_id ?? null
 
   // Keep the active operation card fresh
   useEffect(() => {
-    if (!runningSim) return
-    const timer = setInterval(() => {
-      api.getSim(runningSim.sim_id)
+    if (!runningSimId) return
+    const refresh = () => {
+      api.getSim(runningSimId)
         .then((fresh) =>
           setSims((prev) =>
             prev.map((s) =>
               s.sim_id === fresh.sim_id
-                ? { ...s, status: fresh.status, turn: fresh.turn, winner: fresh.winner }
+                ? {
+                    ...s,
+                    status: fresh.status,
+                    turn: fresh.turn,
+                    winner: fresh.winner,
+                    max_turns: fresh.config?.max_turns,
+                  }
                 : s
             )
           )
         )
         .catch(() => {})
-    }, 10_000)
+    }
+    refresh()
+    const timer = setInterval(refresh, 10_000)
     return () => clearInterval(timer)
-  }, [runningSim])
+  }, [runningSimId])
 
   const stats = useMemo(() => {
     const completed = sims.filter((s) => s.status === "completed")
@@ -81,7 +103,16 @@ export default function HomePage() {
       ironhold: completed.filter((s) => s.winner === "ironhold").length,
       verdant: completed.filter((s) => s.winner === "verdant").length,
       avgTurns,
+      running: sims.filter((s) => s.status === "running").length,
     }
+  }, [sims])
+
+  const civWins = useMemo(() => {
+    const wins: Record<string, number> = {}
+    for (const s of sims) {
+      if (s.status === "completed" && s.winner) wins[s.winner] = (wins[s.winner] ?? 0) + 1
+    }
+    return wins
   }, [sims])
 
   const toggleCiv = (id: string) =>
@@ -95,10 +126,28 @@ export default function HomePage() {
   const recentSims = sims.slice(0, 4)
 
   return (
-    <main className="min-h-screen bg-zinc-950 flex flex-col">
+    <main className="min-h-screen bg-zinc-950 flex flex-col relative">
+
+      {/* ── Fixed background: WebGL hex field + ambient blobs ───── */}
+      {/* Fixed so it never adds scrollable height — the page itself scrolls freely */}
+      <div aria-hidden="true" className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div
+          className="blob-drift absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full
+                     bg-indigo-900/30 blur-[140px]"
+        />
+        <div
+          className="blob-drift-reverse absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full
+                     bg-amber-900/20 blur-[140px]"
+        />
+        <HexFieldCanvas />
+        {/* Scrim keeps hero text legible over the 3D scene */}
+        <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/85 via-zinc-950/35 to-zinc-950/70" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-zinc-950 to-transparent" />
+      </div>
 
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-900">
+      <header className="relative z-10 flex items-center justify-between px-6 py-3 border-b border-zinc-900/80
+                         bg-zinc-950/40 backdrop-blur-sm">
         <div className="flex items-center gap-2 text-zinc-300">
           <Globe size={16} className="text-indigo-400" />
           <span className="text-sm font-semibold tracking-tight">CivilEx</span>
@@ -134,47 +183,63 @@ export default function HomePage() {
       </header>
 
       {/* ── Main content ────────────────────────────────────────── */}
-      <div className="flex-1 grid lg:grid-cols-[1fr_380px] gap-0">
+      <div className="flex-1 grid lg:grid-cols-[1fr_380px] gap-0 relative z-10">
 
         {/* Left — Hero + CTA */}
         <div className="flex flex-col items-start justify-center px-10 py-16 relative">
           {/* Subtle background glow */}
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/20 via-transparent to-transparent pointer-events-none" />
 
-          {/* Icon mark */}
-          <div className="relative mb-8 w-14 h-14 rounded-2xl bg-indigo-600/15 border border-indigo-500/20
-                          flex items-center justify-center text-indigo-400">
-            <Globe size={26} />
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-indigo-500
-                             border-2 border-zinc-950" />
+          {/* Hexagon mark */}
+          <div className="rise relative mb-8 w-20 h-20" aria-hidden="true">
+            <div className="hex-shape hex-mark-glow absolute inset-0" />
+            <div className="hex-shape hex-mark absolute inset-0">
+              <div className="hex-shape absolute inset-[4px] bg-zinc-950" />
+            </div>
           </div>
 
-          <h1 className="text-5xl font-bold tracking-tight text-zinc-50 mb-4 leading-tight">
+          <div className="rise text-[11px] font-mono text-zinc-500 uppercase tracking-widest mb-3"
+               style={{ animationDelay: "100ms" }}>
+            Age III · Epoch 2486
+          </div>
+          <h1 className="rise title-glow text-5xl font-bold tracking-tighter text-zinc-50 mb-4 leading-tight"
+              style={{ animationDelay: "180ms" }}>
             AI Civilization<br />Simulator
           </h1>
-          <p className="text-zinc-400 text-lg max-w-sm mb-8 leading-relaxed">
+          <p className="rise text-zinc-400 text-lg max-w-sm mb-8 leading-relaxed"
+             style={{ animationDelay: "260ms" }}>
             Four factions. Fifty turns. One history.
             Watch AI civilizations forge alliances, declare war, and shape the world.
           </p>
 
           {/* CTA */}
-          <div className="flex items-center gap-3 mb-4 relative z-10">
+          <div className="rise flex items-center gap-3 mb-4 relative z-10" style={{ animationDelay: "340ms" }}>
             <button
               onClick={handleStart}
               disabled={isStarting || dbStatus !== "connected" || selectedCivs.length < 2}
-              className="flex items-center gap-2.5 px-7 py-3.5 rounded-xl bg-indigo-600
+              className="group flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-indigo-600
                          hover:bg-indigo-500 active:bg-indigo-700
                          disabled:opacity-40 disabled:cursor-not-allowed
                          text-white font-semibold text-sm transition-all
                          shadow-lg shadow-indigo-900/40"
             >
-              <Play size={13} />
+              {isStarting ? (
+                <span className="inline-block w-4 h-4 rounded-full border-t-2 border-white animate-spin" />
+              ) : (
+                <Play size={13} />
+              )}
               {isStarting ? "Starting…" : "Start Simulation"}
+              {!isStarting && (
+                <ChevronRight
+                  size={14}
+                  className="transition-transform duration-200 group-hover:translate-x-[3px]"
+                />
+              )}
             </button>
             <button
               onClick={() => setShowConfig((v) => !v)}
               aria-expanded={showConfig}
-              className="flex items-center gap-2 px-5 py-3.5 rounded-xl border border-zinc-700
+              className="flex items-center gap-2 px-5 py-4 rounded-2xl border border-zinc-700
                          hover:border-zinc-500 text-zinc-400 hover:text-zinc-200
                          text-sm font-medium transition-all"
             >
@@ -184,8 +249,8 @@ export default function HomePage() {
 
           {/* Config panel */}
           {showConfig && (
-            <div className="relative z-10 w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900/70
-                            px-5 py-4 mb-4 space-y-4">
+            <div className="config-enter relative z-10 w-full max-w-md rounded-xl border border-zinc-800
+                            bg-zinc-900/70 backdrop-blur-md px-5 py-4 mb-4 space-y-4">
               {/* Max turns */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -270,21 +335,28 @@ export default function HomePage() {
             </p>
           )}
 
-          {/* Quick stats strip */}
-          <div className="grid grid-cols-4 gap-3 mt-8 pt-8 border-t border-zinc-900 w-full max-w-md relative z-10">
-            <StatBox label="Total sims" value={stats.total} />
-            <StatBox label="Ironhold wins" value={stats.ironhold} color={CIV_COLORS.ironhold} />
-            <StatBox label="Verdant wins" value={stats.verdant} color={CIV_COLORS.verdant} />
-            <StatBox label="Avg turns" value={stats.avgTurns} />
+          {/* War record strip */}
+          <div className="rise mt-8 pt-8 border-t border-zinc-900 w-full max-w-lg relative z-10"
+               style={{ animationDelay: "420ms" }}>
+            <div className="text-[10px] font-mono font-semibold text-zinc-600 uppercase tracking-widest mb-3">
+              War Record
+            </div>
+            <div className="grid grid-cols-5 gap-3">
+              <StatBox label="Total sims" value={stats.total} accent="#6366f1" />
+              <StatBox label="Ironhold wins" value={stats.ironhold} accent={CIV_COLORS.ironhold} color={CIV_COLORS.ironhold} />
+              <StatBox label="Verdant wins" value={stats.verdant} accent={CIV_COLORS.verdant} color={CIV_COLORS.verdant} />
+              <StatBox label="Avg turns" value={stats.avgTurns} accent="#52525b" />
+              <StatBox label="In progress" value={stats.running} accent="#6366f1" color={stats.running > 0 ? "#a5b4fc" : undefined} />
+            </div>
           </div>
         </div>
 
         {/* Right — Civilization roster + recent sims */}
-        <div className="border-l border-zinc-900 flex flex-col bg-zinc-950">
+        <div className="border-l border-zinc-900/80 flex flex-col bg-zinc-950/65 backdrop-blur-sm">
 
           {/* Active operation */}
           {runningSim && (
-            <div className="px-4 pt-6">
+            <div className="rise px-4 pt-6" style={{ animationDelay: "200ms" }}>
               <div className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest mb-2 animate-pulse">
                 ⦿ Active Operation
               </div>
@@ -295,14 +367,14 @@ export default function HomePage() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-mono text-zinc-400 truncate">{runningSim.sim_id}</span>
-                  <span className="text-xs font-bold text-indigo-300 tabular-nums">
-                    Turn {runningSim.turn}
+                  <span className="text-xs font-bold text-indigo-300 tabular-nums font-mono">
+                    TURN {runningSim.turn}{runningSim.max_turns ? ` / ${runningSim.max_turns}` : ""}
                   </span>
                 </div>
                 <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-2">
                   <div
-                    className="h-full rounded-full bg-indigo-500 transition-all duration-700"
-                    style={{ width: `${Math.min(100, (runningSim.turn / 50) * 100)}%` }}
+                    className="progress-flow h-full rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, (runningSim.turn / (runningSim.max_turns ?? 50)) * 100)}%` }}
                   />
                 </div>
                 <span className="text-[11px] font-semibold text-indigo-400 flex items-center gap-1">
@@ -313,54 +385,96 @@ export default function HomePage() {
           )}
 
           {/* Section label */}
-          <div className="px-5 pt-8 pb-3">
-            <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+          <div className="px-5 pt-8 pb-3 flex items-center gap-3">
+            <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest flex-shrink-0">
               Civilizations
+            </span>
+            <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-r from-zinc-800 to-transparent" />
+            <span className="text-[10px] font-mono text-zinc-700 tabular-nums">
+              {CIVS.length} FACTIONS
             </span>
           </div>
 
           {/* Civ list */}
           <div className="px-4 flex flex-col gap-2">
-            {CIVS.map((civ) => (
-              <div
-                key={civ.id}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl border border-zinc-800/70
-                           bg-zinc-900/40 hover:border-zinc-700 transition-colors group"
-              >
-                {/* Icon */}
+            {CIVS.map((civ, i) => {
+              const Icon = CIV_ICON_COMPONENTS[civ.id]
+              const wins = civWins[civ.id] ?? 0
+              return (
                 <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: civ.color + "18", border: `1px solid ${civ.color}30`, color: civ.color }}
+                  key={civ.id}
+                  className="civ-card rise group relative overflow-hidden flex items-center gap-3 pl-4 pr-3.5 py-3
+                             rounded-xl border border-zinc-800/70 bg-zinc-900/40"
+                  style={{
+                    "--civ": civ.color,
+                    "--civ-glow": civ.color + "33",
+                    animationDelay: `${300 + i * 90}ms`,
+                  } as React.CSSProperties}
                 >
-                  <civ.Icon size={16} />
-                </div>
-                {/* Text */}
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-zinc-100 truncate leading-tight">
-                    {civ.name}
+                  {/* Left color bar */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-0 top-0 bottom-0 w-[3px]"
+                    style={{ background: `linear-gradient(to bottom, ${civ.color}, ${civ.color}40)` }}
+                  />
+                  {/* Watermark icon */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-3 -bottom-4 opacity-[0.06] transition-opacity duration-300
+                               group-hover:opacity-[0.14] pointer-events-none"
+                    style={{ color: civ.color }}
+                  >
+                    <Icon size={76} />
+                  </span>
+                  {/* Hex emblem */}
+                  <span
+                    className="civ-emblem hex-shape w-10 h-11 flex items-center justify-center flex-shrink-0"
+                    style={{ background: civ.color + "1c", color: civ.color }}
+                  >
+                    <Icon size={17} />
+                  </span>
+                  {/* Text */}
+                  <div className="min-w-0 flex-1 relative">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-semibold text-zinc-100 truncate leading-tight">
+                        {civ.name}
+                      </span>
+                      <span
+                        className="flex items-center gap-1 text-[10px] font-mono tabular-nums flex-shrink-0"
+                        style={{ color: wins > 0 ? civ.color : "#52525b" }}
+                        title={`${wins} ${wins === 1 ? "victory" : "victories"}`}
+                      >
+                        <Trophy size={9} /> {wins}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5 truncate">{civ.desc}</div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                        style={{ background: civ.color + "18", color: civ.color }}
+                      >
+                        {civ.trait}
+                      </span>
+                      <span className="text-[10px] font-mono uppercase tracking-wide text-zinc-600 truncate">
+                        {PLAYSTYLES[civ.trait]}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">{civ.desc}</div>
                 </div>
-                {/* Trait badge */}
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                  style={{ background: civ.color + "18", color: civ.color }}
-                >
-                  {civ.trait}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Recent simulations */}
           {recentSims.length > 0 ? (
             <>
-              <div className="px-5 pt-6 pb-3 flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest">
+              <div className="px-5 pt-6 pb-3 flex items-center gap-3">
+                <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest flex-shrink-0">
                   Recent
                 </span>
+                <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-r from-zinc-800 to-transparent" />
                 <Link href="/history" className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors
-                                                  flex items-center gap-1">
+                                                  flex items-center gap-1 flex-shrink-0">
                   All <ArrowRight size={10} />
                 </Link>
               </div>
@@ -407,7 +521,7 @@ export default function HomePage() {
               </p>
               <button
                 onClick={handleStart}
-                disabled={isStarting || dbStatus !== "connected"}
+                disabled={isStarting || dbStatus !== "connected" || selectedCivs.length < 2}
                 className="text-[11px] font-semibold tracking-widest px-4 py-2.5 rounded-lg
                            border border-indigo-700 text-indigo-300 hover:bg-indigo-600/20
                            disabled:opacity-40 transition-colors"
@@ -434,13 +548,13 @@ export default function HomePage() {
   )
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color?: string }) {
+function StatBox({ label, value, color, accent }: { label: string; value: number; color?: string; accent: string }) {
   return (
-    <div>
-      <div className="text-2xl font-bold tabular-nums" style={{ color: color ?? "#f4f4f5" }}>
+    <div className="pt-2.5" style={{ borderTop: `2px solid ${accent}` }}>
+      <div className="text-3xl font-bold tabular-nums" style={{ color: color ?? "#f4f4f5" }}>
         {value}
       </div>
-      <div className="text-[10px] text-zinc-600 mt-0.5 uppercase tracking-wide">{label}</div>
+      <div className="text-[10px] text-zinc-600 mt-1 uppercase tracking-wide">{label}</div>
     </div>
   )
 }
